@@ -2,7 +2,8 @@
 // Format: see LibraryParser in core. Each exercise is a ladder of variations, easiest first.
 // "start" is the variation a new exercise begins on (1 = first). "intro" orders when exercises join
 // the plan: all intro 1 exercises are in the first week, the rest come in one at a time.
-// Ranges are per set (reps, or seconds). Per-side exercises: the range is per side.
+// Ranges are per set (reps, or seconds). One-sided moves ("sides: each" or "sides: alternate", or the same
+// at the end of a variation line) always count per side: 8 means 8 on the left and 8 on the right.
 // The goal is muscle build-up, so most ranges sit around 6-15 reps, and harder variations replace endless reps.
 
 // ───────────────────────────── PUSH ─────────────────────────────
@@ -26,7 +27,7 @@ cue: If your hips sag, rest and finish the set on a table instead.
 variation: Slow push-up | 6-12 | 3 seconds down, 1 second pause just above the floor, then push up.
 variation: Feet-elevated push-up | 6-12 | Feet on a chair or step, hands on the floor.
 cue: Keep your hips in line: the raised feet make them want to pike up.
-variation: Archer push-up | 4-10 | Hands very wide. Lower toward one hand while the other arm stays almost straight. Alternate sides; count each side as one rep.
+variation: Archer push-up | 3-6 | Hands very wide. Lower toward one hand while the other arm stays almost straight, then push up and lower toward the other hand. | alternate
 
 @exercise PIKE
 title: Pike push-up
@@ -142,7 +143,7 @@ cue: Check that the door is closed and latched, and pull on its handle side only
 variation: Upright towel row | 8-15 | Lean back only a little. Walk your feet back to make it easier.
 variation: Towel row | 8-15 | Walk your feet closer to the door so you lean back further.
 variation: Slow towel row | 8-15 | Lean back as far as you control. Pause 2 seconds at the top of each rep.
-variation: One-arm towel row | 5-10 | Hold both towel ends in one hand, other hand on your chest. Do all the reps on one side, then the other.
+variation: One-arm towel row | 5-10 | Hold both towel ends in one hand, other hand on your chest. | each
 
 // ───────────────────────────── LEGS ─────────────────────────────
 
@@ -162,8 +163,8 @@ cue: Chest up, back neutral. Go as deep as you can while your heels stay down an
 variation: Chair squat | 10-20 | Sit down to a chair, touch lightly without resting, and stand up.
 variation: Squat | 12-25 | Bodyweight squat, thighs at least parallel to the floor.
 variation: Pause squat | 10-20 | Hold the bottom position 3 seconds on every rep.
-variation: Cossack squat | 6-12 | Very wide stance. Sit down over one leg while the other stays straight, toes up. Alternate sides; count each side.
-variation: Assisted pistol squat | 4-10 | On one leg, holding the door frame lightly. Sit back to a low chair. Count each leg.
+variation: Cossack squat | 3-6 | Very wide stance. Sit down over one leg while the other stays straight, toes up, then shift across to the other leg. | alternate
+variation: Assisted pistol squat | 3-8 | On one leg, holding the door frame lightly. Sit back to a low chair. | each
 
 @exercise SPLIT_SQUAT
 title: Split squat
@@ -173,7 +174,7 @@ sets: 2
 rest: 45
 start: 2
 intro: 2
-per side: yes
+sides: each
 figure: SPLIT
 muscles: quads glutes | hamstrings calves
 cue: Long stride: front foot flat, back heel up. Most of your weight on the front leg.
@@ -199,9 +200,8 @@ cue: Lie on your back, knees bent, feet flat near your hips.
 cue: Push through your heels and lift your hips until your body is straight from knees to shoulders.
 cue: Squeeze your glutes at the top for a second. Don't arch your lower back.
 variation: Glute bridge | 12-25 | Both feet on the floor.
-variation: Single-leg glute bridge | 8-15 | One foot on the floor, the other leg straight up or held to your chest. Do both legs.
-cue: The reps count per leg.
-variation: Single-leg hip thrust | 8-15 | Shoulders on the couch or a chair, one foot on the floor. Do both legs.
+variation: Single-leg glute bridge | 8-15 | One foot on the floor, the other leg straight up or held to your chest. | each
+variation: Single-leg hip thrust | 8-15 | Shoulders on the couch or a chair, one foot on the floor. | each
 
 @exercise CALF_RAISE
 title: Calf raise
@@ -217,7 +217,7 @@ cue: Rise all the way up onto the balls of your feet, pause, then lower slowly.
 cue: Hold a wall or door frame lightly for balance only.
 variation: Calf raise | 15-30 | Both feet, on flat ground.
 variation: Calf raise on a step | 12-25 | Balls of your feet on a step, heels lower below the step at the bottom.
-variation: Single-leg calf raise | 10-20 | One foot on the step. Count each leg.
+variation: Single-leg calf raise | 10-20 | One foot on the step. | each
 
 @exercise STEP_UP
 title: Step-up
@@ -227,7 +227,7 @@ sets: 2
 rest: 45
 start: 1
 intro: 4
-per side: yes
+sides: each
 figure: STEPUP
 muscles: quads glutes | calves
 equipment: a sturdy step, bench or chair
@@ -266,7 +266,7 @@ sets: 2
 rest: 30
 start: 1
 intro: 2
-per side: yes
+sides: each
 figure: SIDEPLANK
 muscles: obliques | abs shoulders
 cue: Elbow right under your shoulder. Body in a straight line from head to feet.
@@ -283,14 +283,15 @@ sets: 2
 rest: 30
 start: 1
 intro: 1
+sides: alternate
 figure: DEADBUG
 muscles: abs | obliques
 cue: Lie on your back, arms straight up, knees bent at 90° above your hips.
 cue: Press your lower back into the floor and keep it there the whole time.
-cue: Slowly extend the opposite arm and leg toward the floor, return, and switch. Each side is one rep.
-variation: Dead bug | 8-16 | Opposite arm and leg, slow and controlled.
-variation: Slow dead bug | 8-16 | Take 3 seconds to extend, breathe out fully as you do.
-variation: Straight-leg dead bug | 8-14 | Legs start straight up toward the ceiling.
+cue: Slowly extend the opposite arm and leg toward the floor, return, and switch to the other pair.
+variation: Dead bug | 4-8 | Opposite arm and leg, slow and controlled.
+variation: Slow dead bug | 4-8 | Take 3 seconds to extend, breathe out fully as you do.
+variation: Straight-leg dead bug | 4-7 | Legs start straight up toward the ceiling.
 
 @exercise BIRD_DOG
 title: Bird dog
@@ -300,14 +301,15 @@ sets: 2
 rest: 30
 start: 1
 intro: 3
+sides: alternate
 figure: BIRDDOG
 muscles: lower_back glutes | abs shoulders
 cue: On hands and knees, hands under shoulders, knees under hips, back flat.
 cue: Reach one arm forward and the opposite leg back until both are level with your body.
-cue: Hips stay square to the floor. Hold 2 seconds, return, switch. Each side is one rep.
-variation: Bird dog | 8-16 | Slow, with a 2-second hold.
-variation: Bird dog with elbow-to-knee | 8-14 | After the reach, bring elbow and knee together under your body, then reach again.
-variation: Superman | 8-15 | Lie face down and lift your arms, chest and legs a little off the floor. Hold 2 seconds.
+cue: Hips stay square to the floor. Hold 2 seconds, return, and switch to the other pair.
+variation: Bird dog | 4-8 | Slow, with a 2-second hold.
+variation: Bird dog with elbow-to-knee | 4-7 | After the reach, bring elbow and knee together under your body, then reach again.
+variation: Superman | 8-15 | Lie face down and lift your arms, chest and legs a little off the floor. Hold 2 seconds. | none
 
 @exercise KNEE_RAISE
 title: Hanging knee raise

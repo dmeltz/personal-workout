@@ -29,13 +29,23 @@ enum class Muscle(val label: String) {
     CALVES("Calves"),
 }
 
-/** One step on an exercise's ladder, from easiest to hardest. [min]..[max] is the target range per set. */
+/**
+ * How a one-sided movement is counted. The target is always per side: 8 means 8 on the left and 8 on
+ * the right. [EACH]: all reps on one side, then the other. [ALTERNATE]: switch sides every rep.
+ */
+enum class Sides { NONE, EACH, ALTERNATE }
+
+/**
+ * One step on an exercise's ladder, from easiest to hardest. [min]..[max] is the target range per set
+ * (per side for one-sided moves). [sides] overrides the exercise's when this variation differs.
+ */
 data class Variation(
     val name: String,
     val min: Int,
     val max: Int,
     val how: String,
     val cues: List<String>,
+    val sides: Sides? = null,
 )
 
 /**
@@ -47,8 +57,8 @@ data class Exercise(
     val title: String,
     val group: Group,
     val measure: Measure,
-    /** Each set is done once per side (split squats, side planks). */
-    val perSide: Boolean,
+    /** Whether, and how, sets are done on each side (split squats, side planks, dead bugs). */
+    val sides: Sides,
     val sets: Int,
     /** Rest between sets, in seconds. */
     val rest: Int,
@@ -68,6 +78,23 @@ data class Exercise(
 ) {
     fun variation(index: Int): Variation = variations[index.coerceIn(0, variations.lastIndex)]
     val unit: String get() = if (measure == Measure.REPS) "reps" else "s"
+
+    fun sidesAt(variation: Int): Sides = variation(variation).sides ?: sides
+    fun perSide(variation: Int): Boolean = sidesAt(variation) != Sides.NONE
+
+    /** "8 reps" or "8 reps per side". */
+    fun amount(variation: Int, n: Int): String = "$n $unit" + if (perSide(variation)) " per side" else ""
+
+    /** How to do the sides for a target, in plain words, or null for a two-sided move. */
+    fun sidesHow(variation: Int, n: Int): String? = when (sidesAt(variation)) {
+        Sides.NONE -> null
+        Sides.EACH -> if (measure == Measure.REPS) {
+            "Do all $n reps on one side, then $n on the other ($n per side, ${n * 2} in total)."
+        } else {
+            "Hold $n s on one side, then $n s on the other."
+        }
+        Sides.ALTERNATE -> "Switch sides every rep: left, right, left… Count each side: $n per side is ${n * 2} reps in total."
+    }
 }
 
 /** A warm-up move; [figure] names its stick figure in [Figures], if it has one. */
@@ -161,13 +188,22 @@ class Figure(
  * line: Stop if something hurts.
  * ```
  *
- * Optional lines: "per side: yes", "equipment: pull-up bar". Lines starting with "//" and blank lines are ignored.
+ * Optional lines: "sides: each" or "sides: alternate" (the target is then per side), "equipment: pull-up bar".
+ * A variation can end with "| each", "| alternate" or "| none" when it differs from its exercise. Lines starting with "//" and blank lines are ignored.
  */
 object LibraryParser {
     private fun muscles(id: String, text: String): List<Muscle> =
         text.split(" ", ",").map { it.trim() }.filter { it.isNotEmpty() }.map { name ->
             Muscle.entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: error("Exercise $id: unknown muscle $name")
         }
+
+    private fun sides(id: String, text: String?): Sides? = when (text?.lowercase()) {
+        null -> null
+        "each" -> Sides.EACH
+        "alternate" -> Sides.ALTERNATE
+        "none" -> Sides.NONE
+        else -> error("Exercise $id: sides must be each, alternate or none")
+    }
 
     fun parse(text: String): Library {
         val exercises = mutableListOf<Exercise>()
@@ -179,13 +215,13 @@ object LibraryParser {
         val fields = mutableMapOf<String, String>()
         val cues = mutableListOf<String>()
         val variations = mutableListOf<Variation>()
-        var varName = ""; var varMin = 0; var varMax = 0; var varHow = ""
+        var varName = ""; var varMin = 0; var varMax = 0; var varHow = ""; var varSides: Sides? = null
         val varCues = mutableListOf<String>()
         var inVariation = false
 
         fun flushVariation() {
             if (!inVariation) return
-            variations += Variation(varName, varMin, varMax, varHow, varCues.toList())
+            variations += Variation(varName, varMin, varMax, varHow, varCues.toList(), varSides)
             varCues.clear(); inVariation = false
         }
 
@@ -203,7 +239,7 @@ object LibraryParser {
                     "seconds" -> Measure.SECONDS
                     else -> error("Exercise $exId: measure must be reps or seconds")
                 },
-                perSide = fields["per side"] == "yes",
+                sides = sides(exId, fields["sides"]) ?: Sides.NONE,
                 sets = need("sets").toInt(),
                 rest = need("rest").toInt(),
                 start = (fields["start"] ?: "1").toInt() - 1,
@@ -239,16 +275,17 @@ object LibraryParser {
                 line.startsWith("variation:") -> {
                     flushVariation()
                     val parts = line.substringAfter(":").split("|").map { it.trim() }
-                    if (parts.size != 3) fail("variation needs 'name | min-max | how'")
+                    if (parts.size !in 3..4) fail("variation needs 'name | min-max | how[ | sides]'")
                     val range = parts[1].split("-").map { it.trim().toIntOrNull() ?: fail("bad range") }
                     if (range.size != 2 || range[0] < 1 || range[1] <= range[0]) fail("bad range")
                     varName = parts[0]; varMin = range[0]; varMax = range[1]; varHow = parts[2]
+                    varSides = parts.getOrNull(3)?.let { sides(id ?: "", it) ?: fail("sides must be each, alternate or none") }
                     inVariation = true
                 }
                 line.startsWith("cue:") -> (if (inVariation) varCues else cues) += line.substringAfter(":").trim()
                 line.contains(":") -> {
                     val key = line.substringBefore(":").trim()
-                    if (key !in setOf("title", "group", "measure", "per side", "sets", "rest", "start", "intro", "equipment", "figure", "muscles")) {
+                    if (key !in setOf("title", "group", "measure", "sides", "sets", "rest", "start", "intro", "equipment", "figure", "muscles")) {
                         fail("unknown field")
                     }
                     fields[key] = line.substringAfter(":").trim()

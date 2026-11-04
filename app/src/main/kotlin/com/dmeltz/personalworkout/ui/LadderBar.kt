@@ -57,7 +57,6 @@ fun LadderBar(ex: Exercise, s: ExerciseState?, height: Dp = 8.dp, modifier: Modi
 /** The ladder bar with words: which variation, and where the target is in its range. */
 @Composable
 fun LadderDetail(ex: Exercise, s: ExerciseState?) {
-    val unit = ex.unit + if (ex.perSide) " per side" else ""
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         LadderBar(ex, s, height = 14.dp)
         Row(Modifier.fillMaxWidth()) {
@@ -82,7 +81,7 @@ fun LadderDetail(ex: Exercise, s: ExerciseState?) {
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                "Target ${s.target} $unit, in a range of ${v.min}–${v.max} " +
+                "Target ${ex.amount(s.variation, s.target)}, in a range of ${v.min}–${v.max} " +
                     "(${(rangeFraction(ex, s) * 100).toInt()}% of the way). " +
                     if (s.variation < ex.variations.lastIndex) "Past ${v.max} you move to variation ${s.variation + 2}."
                     else "Past ${v.max} you add a set.",

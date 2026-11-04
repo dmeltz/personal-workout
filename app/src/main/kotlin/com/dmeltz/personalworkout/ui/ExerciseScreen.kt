@@ -32,7 +32,6 @@ import java.time.format.DateTimeFormatter
 fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRecord>, onBack: () -> Unit) {
     val s = state.exerciseState(exercise.id)
     val color = groupColors.getValue(exercise.group)
-    val unit = exercise.unit + if (exercise.perSide) " per side" else ""
     Page(title = exercise.title, onBack = onBack) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
@@ -43,7 +42,7 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
             ExerciseMuscles(exercise)
             if (s != null) {
                 Text(
-                    "Level %.2f · now ${s.sets} × ${s.target} $unit".format(Progression.level(exercise, s)),
+                    "Level %.2f · now ${s.sets} × ${exercise.amount(s.variation, s.target)}".format(Progression.level(exercise, s)),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = color,
@@ -62,7 +61,7 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
                         val current = s?.variation == i
                         Column {
                             Text(
-                                "${i + 1}. ${v.name}  (${v.min}–${v.max} $unit)" + if (current) "  ← you are here" else "",
+                                "${i + 1}. ${v.name}  (${v.min}–${exercise.amount(i, v.max)})" + if (current) "  ← you are here" else "",
                                 fontWeight = if (current) FontWeight.Bold else FontWeight.Normal,
                                 color = if (current) color else MaterialTheme.colorScheme.onSurface,
                             )
@@ -116,7 +115,7 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
                             Text("${LocalDate.ofEpochDay(r.day).format(format)} · ${r.variation}", style = MaterialTheme.typography.bodyMedium)
                             Text(
                                 if (r.effort == Effort.SKIPPED) "Skipped (target ${r.target})"
-                                else "${r.done.joinToString(" / ")} ${exercise.unit} (target ${r.target})",
+                                else "${r.done.joinToString(" / ")} ${exercise.unit}${if (r.perSide) " per side" else ""} (target ${r.target})",
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
