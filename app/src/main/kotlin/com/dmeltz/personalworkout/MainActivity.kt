@@ -19,14 +19,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.FileProvider
 import com.dmeltz.personalworkout.core.AppState
+import com.dmeltz.personalworkout.core.DayKind
 import com.dmeltz.personalworkout.core.SessionBuilder
 import com.dmeltz.personalworkout.core.Sessions
 import com.dmeltz.personalworkout.reminder.Reminders
 import com.dmeltz.personalworkout.sync.AnswerSync
 import com.dmeltz.personalworkout.ui.AppTheme
+import com.dmeltz.personalworkout.ui.ExerciseScreen
 import com.dmeltz.personalworkout.ui.HomeScreen
 import com.dmeltz.personalworkout.ui.ProgressScreen
-import com.dmeltz.personalworkout.ui.RuleScreen
 import com.dmeltz.personalworkout.ui.SessionScreen
 import com.dmeltz.personalworkout.ui.SettingsScreen
 import com.dmeltz.personalworkout.widget.StreakWidget
@@ -35,13 +36,11 @@ sealed interface Screen {
     data object Home : Screen
     data class Session(val openedAt: Long) : Screen
     data object Progress : Screen
-    data class Rule(val ruleId: String) : Screen
+    data class Exercise(val id: String) : Screen
     data object Settings : Screen
 }
 
 class MainActivity : ComponentActivity() {
-    private lateinit var speaker: Speaker
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // The app is always dark, so the status bar always gets light icons.
@@ -49,7 +48,6 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
-        speaker = Speaker(this)
         val repo = Repository.get(this)
         Reminders.schedule(this)
 
@@ -57,7 +55,7 @@ class MainActivity : ComponentActivity() {
             AppTheme {
                 var state by remember {
                     // A session whose last answer was given while the app was closed still counts.
-                    mutableStateOf(Sessions.settle(repo.state).also { if (it != repo.state) repo.save(it) })
+                    mutableStateOf(Sessions.settle(repo.library, repo.state).also { if (it != repo.state) repo.save(it) })
                 }
                 var stack by remember { mutableStateOf(listOf<Screen>(Screen.Home)) }
                 val screen = stack.last()
@@ -72,7 +70,7 @@ class MainActivity : ComponentActivity() {
                 fun pop() {
                     if (stack.size <= 1) return
                     if (stack.last() is Screen.Session) {
-                        update(Sessions.settle(state))
+                        update(Sessions.settle(repo.library, state))
                         StreakWidget.updateAll(this@MainActivity)
                     }
                     stack = stack.dropLast(1)
@@ -90,21 +88,27 @@ class MainActivity : ComponentActivity() {
                 key(screen) { when (screen) {
                     Screen.Home -> HomeScreen(
                         state = state,
-                        onStart = {
-                            val plan = SessionBuilder.build(repo.curriculum, state, today())
-                            update(Sessions.start(state, plan, today()))
+                        library = repo.library,
+                        onStart = { anyway ->
+                            val day = today()
+                            val kind = if (anyway) DayKind.NORMAL else SessionBuilder.dayKind(state, day)
+                            val plan = SessionBuilder.build(repo.library, state, day, kind)
+                            update(Sessions.start(repo.library, state, plan, day))
                             push(Screen.Session(System.currentTimeMillis()))
+                        },
+                        onState = {
+                            update(it)
+                            StreakWidget.updateAll(this@MainActivity)
                         },
                         onContinue = { push(Screen.Session(System.currentTimeMillis())) },
                         onProgress = { push(Screen.Progress) },
                         onSettings = { push(Screen.Settings) },
                     )
                     is Screen.Session -> SessionScreen(
-                        curriculum = repo.curriculum,
+                        library = repo.library,
                         initialState = state,
-                        speaker = speaker,
                         onState = ::update,
-                        onAnswer = repo::appendAnswer,
+                        onRecord = repo::appendRecord,
                         onFinished = {
                             StreakWidget.updateAll(this@MainActivity)
                             stack = listOf(Screen.Home)
@@ -113,22 +117,19 @@ class MainActivity : ComponentActivity() {
                     )
                     Screen.Progress -> ProgressScreen(
                         state = state,
-                        curriculum = repo.curriculum,
-                        onRule = { push(Screen.Rule(it)) },
+                        library = repo.library,
+                        onExercise = { push(Screen.Exercise(it)) },
                         onBack = ::pop,
                     )
-                    is Screen.Rule -> RuleScreen(
-                        rule = repo.curriculum.rule(screen.ruleId),
-                        details = repo.curriculum.details(screen.ruleId),
+                    is Screen.Exercise -> ExerciseScreen(
+                        exercise = repo.library.exercise(screen.id)!!,
                         state = state,
-                        answers = remember(screen.ruleId) {
-                            repo.answers().filter { screen.ruleId in it.ruleIds }
-                        },
+                        records = remember(screen.id) { repo.records().filter { it.exerciseId == screen.id } },
                         onBack = ::pop,
                     )
                     Screen.Settings -> SettingsScreen(
                         state = state,
-                        itemCount = repo.curriculum.items.size,
+                        library = repo.library,
                         version = BuildConfigInfo.versionName(this@MainActivity),
                         onState = {
                             update(it)
@@ -145,11 +146,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         StreakWidget.updateAll(this)
-    }
-
-    override fun onDestroy() {
-        speaker.shutdown()
-        super.onDestroy()
     }
 
     private fun shareExport() {

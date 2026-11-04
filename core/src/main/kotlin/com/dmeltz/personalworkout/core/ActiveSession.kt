@@ -2,42 +2,28 @@ package com.dmeltz.personalworkout.core
 
 import kotlinx.serialization.Serializable
 
-@Serializable
-data class SessionEntry(val itemId: String, val retry: Boolean = false)
-
 /**
- * A practice session in progress, saved after every answer so it can be continued later the same day.
- * [position] is the index of the next unanswered entry. Retries of wrong answers are appended to [entries].
+ * A session in progress, saved after every log so it can be continued later the same day.
+ * [position] is the index of the next exercise to log.
  */
 @Serializable
 data class ActiveSession(
     val day: Day,
     val number: Int,
-    val newRuleIds: List<String>,
-    val entries: List<SessionEntry>,
+    val kind: DayKind,
+    val exerciseIds: List<String>,
     val position: Int = 0,
-    val remindersShown: List<String> = emptyList(),
-    val firstTryCorrect: Int = 0,
-    val missedRuleIds: List<String> = emptyList(),
+    val warmupDone: Boolean = false,
+    val easy: Int = 0,
+    val hard: Int = 0,
+    val skipped: Int = 0,
+    /** Exercises whose variation went up during this session. */
+    val levelledUp: List<String> = emptyList(),
 ) {
-    /** The planned exercises, not counting retries. */
-    val plannedCount: Int get() = entries.count { !it.retry }
-
-    /** Planned exercises answered so far. */
-    val answeredCount: Int get() = entries.take(position).count { !it.retry }
-
-    val finished: Boolean get() = position >= entries.size
-
-    fun next(): SessionEntry? = entries.getOrNull(position)
-
-    companion object {
-        fun start(plan: SessionPlan, state: AppState, today: Day) = ActiveSession(
-            day = today,
-            number = state.sessionsCompleted + 1,
-            newRuleIds = plan.newRules.map { it.id },
-            entries = plan.items.map { SessionEntry(it.id) },
-        )
-    }
+    val plannedCount: Int get() = exerciseIds.size
+    val doneCount: Int get() = position
+    val finished: Boolean get() = position >= exerciseIds.size
+    fun next(): String? = exerciseIds.getOrNull(position)
 }
 
 /** Today's unfinished session, if there is one. A session left over from an earlier day is dropped. */
@@ -45,40 +31,66 @@ fun AppState.sessionToContinue(today: Day): ActiveSession? =
     activeSession?.takeIf { it.day == today && !it.finished }
 
 object Sessions {
-    /** Starts a session: its new rules count as started from now. */
-    fun start(state: AppState, plan: SessionPlan, today: Day): AppState =
-        plan.newRules.fold(state) { s, r -> Progress.introduceRule(s, r.id, today) }
-            .copy(activeSession = ActiveSession.start(plan, state, today))
-
-    /** Records an answer to the next entry: scores, schedule, and the session's own position. */
-    fun answer(state: AppState, item: Item, result: CheckResult, today: Day): AppState {
-        val session = state.activeSession ?: return state
-        val entry = session.next() ?: return state
-        val updated = Progress.applyAnswer(state, item, result, today, entry.retry)
-        val retryEntry = if (!result.correct && !entry.retry) listOf(SessionEntry(item.id, retry = true)) else emptyList()
-        return updated.copy(
-            activeSession = session.copy(
-                entries = session.entries + retryEntry,
-                position = session.position + 1,
-                firstTryCorrect = session.firstTryCorrect + if (!entry.retry && result.correct) 1 else 0,
-                missedRuleIds = session.missedRuleIds +
-                    if (!entry.retry && !result.ruleCorrect) listOf(item.primaryRuleId) else emptyList(),
+    /** Starts a session: its new exercises count as started from now. */
+    fun start(library: Library, state: AppState, plan: SessionPlan, today: Day): AppState {
+        val started = plan.startIds.mapNotNull { library.exercise(it) }
+            .associate { it.id to Progression.initial(it, today) }
+        return state.copy(
+            exercises = state.exercises + started,
+            activeSession = ActiveSession(
+                day = today,
+                number = state.sessionsCompleted + 1,
+                kind = plan.kind,
+                exerciseIds = plan.exerciseIds,
             ),
         )
     }
 
-    fun reminderShown(state: AppState, ruleId: String): AppState {
+    fun warmupDone(state: AppState): AppState =
+        state.copy(activeSession = state.activeSession?.copy(warmupDone = true))
+
+    /** Logs the next exercise: progression, muscle group recovery, and the session position. */
+    fun log(state: AppState, ex: Exercise, done: List<Int>, effort: Effort, today: Day): AppState {
         val session = state.activeSession ?: return state
-        return state.copy(activeSession = session.copy(remindersShown = session.remindersShown + ruleId))
+        val before = state.exerciseState(ex.id) ?: Progression.initial(ex, today)
+        val after = Progression.apply(ex, before, done, effort, today)
+        val trained = if (effort == Effort.SKIPPED) state.groupLastTrained
+        else state.groupLastTrained + (ex.group.name to today)
+        return state.copy(
+            exercises = state.exercises + (ex.id to after),
+            groupLastTrained = trained,
+            activeSession = session.copy(
+                position = session.position + 1,
+                easy = session.easy + if (effort == Effort.EASY) 1 else 0,
+                hard = session.hard + if (effort == Effort.HARD) 1 else 0,
+                skipped = session.skipped + if (effort == Effort.SKIPPED) 1 else 0,
+                levelledUp = session.levelledUp + if (after.variation > before.variation) listOf(ex.id) else emptyList(),
+            ),
+        )
     }
 
-    /** Finishes the session: counts the day for the streak and grade history. */
-    fun finish(state: AppState, today: Day): AppState =
-        Progress.completeSession(state, today).copy(activeSession = null)
-
-    /** A session whose last answer was given but whose summary wasn't reached still counts. */
-    fun settle(state: AppState): AppState {
-        val session = state.activeSession ?: return state
-        return if (session.finished) finish(state, session.day) else state
+    /** Finishes the session: counts the day for the streak and records the levels. */
+    fun finish(library: Library, state: AppState, today: Day): AppState {
+        val days = if (state.trainedOn(today)) state.sessionDays else (state.sessionDays + today).sorted()
+        val point = Progression.levelPoint(library, state, today)
+        val history = if (point == null) state.levelHistory
+        else (state.levelHistory.filter { it.day != today } + point).sortedBy { it.day }
+        return state.copy(
+            sessionDays = days,
+            levelHistory = history,
+            sessionsCompleted = state.sessionsCompleted + 1,
+            activeSession = null,
+        )
     }
+
+    /** A session whose last exercise was logged but whose summary wasn't reached still counts. */
+    fun settle(library: Library, state: AppState): AppState {
+        val session = state.activeSession ?: return state
+        return if (session.finished) finish(library, state, session.day) else state
+    }
+
+    /** Marks or unmarks [day] as a capoeira day. */
+    fun setCapoeira(state: AppState, day: Day, on: Boolean): AppState = state.copy(
+        capoeiraDays = if (on) (state.capoeiraDays + day).distinct().sorted() else state.capoeiraDays - day,
+    )
 }

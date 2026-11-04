@@ -25,7 +25,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.TimeUnit
 
-/** Where to send the answers, and how the last attempt went. */
+/** Where to send the history, and how the last attempt went. */
 @Serializable
 data class SyncSettings(
     val repo: String = AnswerSync.DEFAULT_REPO,
@@ -37,7 +37,7 @@ data class SyncSettings(
 }
 
 /**
- * Sends the whole export (progress and every answer) to a private GitHub repository, so Claude can
+ * Sends the whole export (progress and every logged exercise) to a private GitHub repository, so Claude can
  * read it and adjust the app. The file is replaced each time; GitHub keeps every version in its history.
  */
 object AnswerSync {
@@ -70,7 +70,7 @@ object AnswerSync {
         data class Failed(val message: String) : Result
     }
 
-    /** Sends the answers now, and records the outcome in the settings. */
+    /** Sends the history now, and records the outcome in the settings. */
     suspend fun send(context: Context): Result = withContext(Dispatchers.IO) {
         val settings = load(context)
         if (!settings.configured) return@withContext Result.Failed("Not set up")
@@ -121,7 +121,7 @@ object AnswerSync {
         }
 
         val body = buildJsonObject {
-            put("message", JsonPrimitive("Progress after session $sessions"))
+            put("message", JsonPrimitive("Personal Workout history after session $sessions"))
             put("content", JsonPrimitive(Base64.encodeToString(content.toByteArray(), Base64.NO_WRAP)))
             if (sha != null) put("sha", JsonPrimitive(sha))
         }.toString()
@@ -137,7 +137,7 @@ object AnswerSync {
         }
     }
 
-    /** Sends the answers in the background as soon as there is a connection, retrying if it fails. */
+    /** Sends the history in the background as soon as there is a connection, retrying if it fails. */
     fun schedule(context: Context) {
         if (!load(context).configured) return
         val request = OneTimeWorkRequestBuilder<SendWorker>()
