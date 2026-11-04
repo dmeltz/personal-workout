@@ -313,14 +313,16 @@ def plank_line(shoulder_y, foot_y=3.0):
     """Pitch for a straight body from the toes up to a shoulder height."""
     return 90 - math.degrees(math.asin((shoulder_y - foot_y) / (TORSO + THIGH + SHIN)))
 
-def prone(shoulder_y, hands_x, hands_dz, pole_out, pole_back, extra=None, hands=None):
-    p = plank_line(shoulder_y)
-    s = dict(pitch=p, legL=fk(0, 2, 0), legR=fk(0, 2, 0), feet="shin", anchor=("toL", (0, 0, -40), "yz"))
+def prone(shoulder_y, hands_x, hands_dz, pole_out, pole_back, extra=None, hands=None, hand_y=0.0, feet_y=0.0, shift=0.0):
+    """A straight body from the toes (on the floor, or raised to feet_y) to the shoulders, hands on
+    the floor or on a surface at hand_y. shift moves the body sideways (archer push-ups)."""
+    p = plank_line(shoulder_y, feet_y + 3)
+    s = dict(pitch=p, hip=(shift, 0, 0), legL=fk(0, 2, 0), legR=fk(0, 2, 0), feet="shin", anchor=("toL", (0, feet_y, -40), "yz"))
     if extra: s.update(extra)
     f = build(s)
     j = f.joints()
     if hands is None:
-        hands = [(hands_x, 0, j["shL"][2] + hands_dz), (-hands_x, 0, j["shR"][2] + hands_dz)]
+        hands = [(hands_x, hand_y, j["shL"][2] + hands_dz), (-hands_x, hand_y, j["shR"][2] + hands_dz)]
     s["armL"] = ik(hands[0], (pole_out, 0.5, -pole_back))
     s["armR"] = ik(hands[1], (-pole_out, 0.5, -pole_back))
     return s, hands
@@ -484,6 +486,281 @@ def bear(step=0):
         s["leg" + side] = ik((j["hip" + side][0], 5.5, j["hip" + side][2] - 15 + foot_dz), (0, -0.3, 1), planted=False)
     return s
 figure("BEAR", [bear(0), bear(1), bear(0), bear(-1)], ["side", "high"], props=[mat()], loop=True, ms=2400)
+
+
+# ───────────────────────────── variations ─────────────────────────────
+# Every variation in exercises.txt names a figure. Slow variations share their base figure's poses,
+# played slower.
+
+def alias(name, base, ms):
+    FIG[name] = dict(FIG[base], ms=ms)
+
+alias("PUSHUP_SLOW", "PUSHUP", 3600)
+alias("PIKE_SLOW", "PIKE", 3600)
+alias("PULLUP_SLOW", "PULLUP", 3600)
+alias("CHINUP_SLOW", "CHINUP", 3600)
+alias("ROW_SLOW", "ROW", 3200)
+alias("SQUAT_PAUSE", "SQUAT", 3600)
+alias("DEADBUG_SLOW", "DEADBUG", 6000)
+
+# Push-ups with hands on a table, feet raised, archer, diamond.
+TABLE_H = 38
+def push_pair(top_y, bottom_y, hands_x, dz, pole_out, hand_y=0.0, feet_y=0.0, bottom_dz=-3, from_top=False):
+    if from_top:
+        # Hands placed under the shoulders at the top (an incline would overreach otherwise).
+        top, hands = prone(top_y, hands_x, dz, pole_out, 1, hand_y=hand_y, feet_y=feet_y)
+        bottom, _ = prone(bottom_y, hands_x, bottom_dz, pole_out, 1, hands=hands, hand_y=hand_y, feet_y=feet_y)
+        return top, bottom, hands
+    bottom, hands = prone(bottom_y, hands_x, bottom_dz, pole_out, 1, hand_y=hand_y, feet_y=feet_y)
+    top, _ = prone(top_y, hands_x, dz, pole_out, 1, hands=hands, hand_y=hand_y, feet_y=feet_y)
+    return top, bottom, hands
+
+top, bottom, hands = push_pair(TABLE_H + 23, TABLE_H + 8, 9.5, 2, 0.8, hand_y=TABLE_H, from_top=True)
+hz = hands[0][2]
+figure("PUSHUP_INCLINE", [top, bottom], ["side", "threeq"], props=[box(-22, 22, 0, TABLE_H, hz - 5, hz + 22)])
+top, bottom, hands = push_pair(TABLE_H + 23, TABLE_H + 9, 3.5, 2, 0.1, hand_y=TABLE_H, from_top=True)
+hz = hands[0][2]
+figure("CLOSE_INCLINE", [top, bottom], ["side", "threeq"], props=[box(-22, 22, 0, TABLE_H, hz - 5, hz + 22)])
+
+CHAIR_H = 20
+top, bottom, _ = push_pair(24, 8, 9.5, 0, 0.8, feet_y=CHAIR_H)
+figure("PUSHUP_FEET_UP", [top, bottom], ["side", "high"], props=[box(-14, 14, 0, CHAIR_H, -50, -30)])
+
+top, bottom, _ = push_pair(24, 9, 1.8, -2, 0.6, bottom_dz=-6)
+figure("DIAMOND_PUSHUP", [top, bottom], ["side", "high"], props=[mat()])
+
+def archer(side):
+    """side 0: top; ±1: lowered toward the left or right hand."""
+    hands = [(20, 0, 0), (-20, 0, 0)]
+    if side == 0:
+        s, _ = prone(21, 0, 0, 0.8, 1, shift=0)
+    else:
+        s, _ = prone(10, 0, 0, 0.8, 1, shift=9 * side)
+    j = build(s).joints()
+    hz = 0.0
+    return s
+# Hands fixed wide, under the shoulders' line.
+_s = archer(0); _j = build(_s).joints(); _hz = _j["shL"][2] - 1
+def archer_pose(side):
+    s = archer(side)
+    for limb, x, sgn in (("armL", 20, 1), ("armR", -20, -1)):
+        bent = (side == 1 and sgn == 1) or (side == -1 and sgn == -1)
+        s[limb] = ik((x, 0, _hz), (sgn * 0.2, 0.6, -1) if bent else (sgn * 0.2, 1, 0.2))
+    return s
+figure("ARCHER_PUSHUP", [archer_pose(0), archer_pose(1), archer_pose(0), archer_pose(-1)], ["front", "high"],
+       props=[mat()], loop=True, ms=3600)
+
+# Pike push-up with feet on a chair: hips stacked over the shoulders.
+def pike_up(torso_pitch, hip_flex, bend_pole):
+    return dict(pitch=torso_pitch, head=-25, legL=fk(hip_flex, 0, 0), legR=fk(hip_flex, 0, 0), toes=(0, -0.6, 1),
+                anchor=("ftL", (5, CHAIR_H + 3.6, -30), "yz"),
+                armL=ik((9, 0, 8), (0.5, 0.4, bend_pole)), armR=ik((-9, 0, 8), (-0.5, 0.4, bend_pole)))
+figure("PIKE_FEET_UP", [pike_up(156, 94, 0), pike_up(158, 88, -1)], ["side", "high"],
+       props=[box(-14, 14, 0, CHAIR_H, -44, -24)])
+
+# ── Hanging ──
+figure("HANG_DEAD", [hang(9.5, 0, 0), hang(9.5, 0.4, 0)], ["front", "side"], props=[bar(BAR)], hanging=True, ms=2400)
+FIG["HANG_ACTIVE"] = dict(FIG["HANG"])
+figure("HANG_FLEXED", [pull_top(9.5, (1, -0.7, -0.3)), dict(pull_top(9.5, (1, -0.7, -0.3)), hip=(0, BAR - TORSO - 7.6, -0.5))],
+       ["front", "side"], props=[bar(BAR)], hanging=True, ms=2400)
+
+def supported(hip_dy):
+    s = hang(9.5, hip_dy)
+    s["legL"] = ik((5, CHAIR_H, 14), (0, 0.3, 1)); s["legR"] = ik((-5, CHAIR_H, 14), (0, 0.3, 1))
+    s["feet"] = "flat"
+    return s
+figure("HANG_SUPPORTED", [supported(0), supported(0.8)], ["side", "front"], hanging=True, ms=2400,
+       props=[bar(BAR), box(-14, 14, 0, CHAIR_H, 6, 26)])
+# The figure hangs from the bar but stands on a chair, so draw the floor too.
+FIG["HANG_SUPPORTED"]["hanging"] = False
+
+def negative(grip, pole_top, pole_hang):
+    top = pull_top(grip, pole_top)
+    j = build(top).joints()
+    chair_y = min(j["ftL"][1], j["ftR"][1]) - 1.5
+    bottom = hang(grip, pole=pole_hang, legs=fk(20, 0, 115))  # knees bent to clear the chair
+    return [top, bottom], box(-14, 14, 0, chair_y, j["ftL"][2] - 9, j["ftL"][2] + 9)
+keys, chair = negative(13, (1, -0.7, -0.3), (1, -0.2, -0.2))
+figure("PULLUP_NEGATIVE", keys, ["back", "side"], props=[bar(BAR), chair], ms=4000)
+keys, chair = negative(6.5, (0.25, -0.6, 1), (0.2, -0.3, 1))
+figure("CHINUP_NEGATIVE", keys, ["front", "side"], props=[bar(BAR), chair], ms=4000)
+
+def hang_legs(legs_top, pitch=-10, hip_dy=1.5):
+    return [hang(9.5, legs=fk(5, 0, 8)), dict(hang(9.5, hip_dy=hip_dy, pitch=pitch), legL=legs_top, legR=legs_top)]
+figure("KNEE_TO_CHEST", hang_legs(fk(135, 0, 120), pitch=-22, hip_dy=4), ["side", "front"], props=[bar(BAR)], hanging=True)
+figure("LEG_RAISE", hang_legs(fk(92, 0, 0), pitch=-14), ["side", "front"], props=[bar(BAR)], hanging=True)
+
+def lying_tuck(tucked):
+    legs = fk(125, 4, 125) if tucked else fk(30, 4, 30)
+    return dict(pitch=-90 + (12 if tucked else 0), yaw=180, hip=(0, 5 + (3 if tucked else 0), 0),
+                armL=fk(0, 12, 0), armR=fk(0, 12, 0), legL=legs, legR=legs, feet="shin")
+figure("LYING_TUCK", [lying_tuck(False), lying_tuck(True)], ["side", "high"], props=[mat()])
+
+# ── Rows ──
+figure("ROW_UPRIGHT", [row(-18, 26, 0.3), row(-10, 9, 0.8)],
+       ["side", "back"], props=[door(36), tether("haL", HANDLE), tether("haR", HANDLE)])
+def one_arm_row(pitch, dist):
+    s = row(pitch, dist, 0.6)
+    s["armL"] = ik(build(s).joints()["shL"] + unit(HANDLE - build(s).joints()["shL"]) * dist, (0.3, -0.6, -1), planted=False)
+    s["armR"] = rel("neck", (-2, -7, 4), (-1, -0.5, 0))
+    s["yaw"] = 8
+    return s
+figure("ROW_ONE_ARM", [one_arm_row(-26, 26), one_arm_row(-14, 9)],
+       ["side", "back"], props=[door(36), tether("haL", HANDLE)])
+
+# ── Squats ──
+figure("CHAIR_SQUAT", [squat((0, 39.7, 0), 0, fk(5, 6, 10)), squat((0, 22.5, -12), 32, fk(110, 6, 5))],
+       ["side", "front"], props=[box(-14, 14, 0, CHAIR_H, -30, -10)])
+
+def cossack(shift):
+    hip = (0, 31, 0) if shift == 0 else (12 * shift, 13, -6)
+    s = dict(hip=hip, pitch=0 if shift == 0 else 30, head=-10 if shift else 0,
+             legL=ik((30, 0, 0), (0.4, 0, 1)), legR=ik((-30, 0, 0), (-0.4, 0, 1)),
+             armL=fk(70 if shift else 10, 8, 10), armR=fk(70 if shift else 10, 8, 10))
+    # The straight leg's toes point up.
+    if shift == 1: s["feetR"] = -60
+    if shift == -1: s["feetL"] = -60
+    return s
+figure("COSSACK", [cossack(0), cossack(1), cossack(0), cossack(-1)], ["front", "threeq"], loop=True, ms=4800)
+
+def pistol(down):
+    if not down:
+        return dict(hip=(0, 39.6, 0), legL=ik((5, 0, 0), (0, 0, 1)), legR=fk(25, 0, 0), armL=fk(80, 8, 0), armR=fk(80, 8, 0))
+    return dict(hip=(0, 19, -13), pitch=38, head=-15, legL=ik((5, 0, 0), (0, 0, 1)), legR=fk(110, 0, 0),
+                armL=fk(115, 8, 0), armR=fk(115, 8, 0))
+figure("PISTOL", [pistol(False), pistol(True)], ["side", "front"], props=[box(-14, 14, 0, 15, -32, -12)])
+
+def split_supported(hip, back_raise):
+    s = split(hip, back_raise)
+    s["armR"] = ik((-17, 34, -1), (-1, -0.5, -0.3), planted=False)
+    return s
+figure("SPLIT_SUPPORTED", [split_supported((0, 37.5, -1), 50), split_supported((0, 21, -2), 60)], ["side", "front"],
+       props=[box(-24, -14, 0, 33, -6, 4)])
+
+def bulgarian(hip_y):
+    return dict(hip=(0, hip_y, -3), armL=fk(5, 8, 10), armR=fk(5, 8, 10), feetR="flat", feetL="line",
+                legR=ik((-5, 0, 12), (0, 0, 1)), legL=ik((5, CHAIR_H + 1.5, -25), (0, -0.4, 1)))
+figure("BULGARIAN", [bulgarian(37), bulgarian(22)], ["side", "front"], props=[box(-12, 14, 0, CHAIR_H, -36, -20)])
+alias("BULGARIAN_SLOW", "BULGARIAN", 3600)
+
+# ── Bridges ──
+def bridge_one_leg(lift, neck=(0, 5, 30)):
+    s = bridge_pose(lift)
+    s["anchor"] = ("neck", neck, "yz")
+    s["legL"] = fk(88, 2, 0)
+    return s
+figure("BRIDGE_ONE_LEG", [bridge_one_leg(0), bridge_one_leg(18)], ["side", "high"], props=[mat()])
+
+COUCH_H = 18
+def hip_thrust(lift):
+    s = dict(pitch=-90 - lift, yaw=180, head=lift, anchor=("neck", (0, COUCH_H + 3, 30), "yz"), toes=(0, 0, -1))
+    j = build(s).joints()
+    xr = j["shR"][0]
+    s["legR"] = ik((np.sign(xr) * 6, 0, -16), (0, 1, 0.2))
+    s["legL"] = fk(85, 2, 95)
+    s["armL"] = fk(160, 40, 60); s["armR"] = fk(160, 40, 60)
+    return s
+figure("HIP_THRUST", [hip_thrust(-28), hip_thrust(0)], ["side", "threeq"], props=[box(-18, 18, 0, COUCH_H, 26, 46)])
+
+# ── Calves ──
+STEP_H = 8
+def calf_step(raise_deg, one_leg=False):
+    s = stand(feet=raise_deg, anchor=("toL", (0, STEP_H, 0), "y"))
+    if one_leg:
+        s["legR"] = fk(5, 0, 70)
+        s["armR"] = fk(30, 30, 40)
+    return s
+figure("CALF_STEP", [calf_step(-28), calf_step(55)], ["side", "threeq_low"], props=[box(-14, 14, 0, STEP_H, 2, 22)])
+figure("CALF_ONE_LEG", [calf_step(-28, True), calf_step(55, True)], ["side", "threeq_low"], props=[box(-14, 14, 0, STEP_H, 2, 22)])
+
+# ── Step-ups ──
+def stepup(h, name):
+    figure(name, [
+        dict(hip=(0, 38.5, 2), pitch=8, legL=ik((5, h, 18), (0, 0, 1)), legR=ik((-5, 0, 0), (0, 0, 1)), armL=fk(-10, 6, 20), armR=fk(30, 6, 30)),
+        dict(hip=(0, 40 + h - 1.5, 18), legL=ik((5, h, 18), (0, 0, 1)), legR=ik((-5, h, 18), (0, 0, 1)), armL=fk(5, 6, 12), armR=fk(5, 6, 12)),
+    ], ["side", "front"], props=[box(-14, 14, 0, h, 9, 33)])
+stepup(9, "STEPUP_LOW")
+alias("STEPUP_SLOW", "STEPUP", 3600)
+
+# ── Planks ──
+figure("PLANK_HOLD", [forearm_plank()], ["side", "high"], props=[mat()])
+figure("PLANK_LEG_LIFT", [forearm_plank(), forearm_plank(dict(legR=fk(-10, 2, 0))), forearm_plank(), forearm_plank(dict(legL=fk(-10, 2, 0), anchor=("toR", (0, 0, -40), "yz")))],
+       ["side", "high"], props=[mat()], loop=True, ms=4000)
+
+def knee_plank():
+    p = 90 - math.degrees(math.asin((13.5 - 2) / (TORSO + THIGH)))
+    s = dict(pitch=p, legL=fk(0, 2, 95), legR=fk(0, 2, 95), feet="line", anchor=("knL", (0, 2, -20), "yz"), head=10)
+    j = build(s).joints()
+    s["armL"] = ik((4, 0, j["shL"][2] + 13), (0.1, -1, 0))
+    s["armR"] = ik((-4, 0, j["shR"][2] + 13), (-0.1, -1, 0))
+    return s
+figure("KNEE_PLANK", [knee_plank()], ["side", "high"], props=[mat()])
+
+def long_plank():
+    p = plank_line(11)
+    s = dict(pitch=p, legL=fk(0, 2, 0), legR=fk(0, 2, 0), feet="shin", anchor=("toL", (0, 0, -40), "yz"), head=10)
+    j = build(s).joints()
+    s["armL"] = ik((4, 0, j["shL"][2] + 22), (0.1, -1, 0.3))
+    s["armR"] = ik((-4, 0, j["shR"][2] + 22), (-0.1, -1, 0.3))
+    return s
+figure("LONG_PLANK", [long_plank()], ["side", "high"], props=[mat()])
+
+def knee_side_plank(top_arm):
+    s = dict(roll=-90 + 26, hip=(0, 0, 0), legL=fk(0, 0, 90), legR=fk(0, 0, 90), feet="line",
+             anchor=("knR", (-22, 1.5, 0), "xy"), armL=top_arm)
+    j = build(s).joints()
+    s["armR"] = ik((j["shR"][0] + 1, 0, j["shR"][2] + 12), (0, -1, 0))
+    return s
+figure("KNEE_SIDEPLANK", [knee_side_plank(fk(0, 8, 0)), knee_side_plank(fk(0, 92, 0))], ["front", "above"], props=[mat()])
+figure("SIDEPLANK_LEG", [side_plank(fk(0, 8, 0)), side_plank(fk(0, 8, 0), top_leg=fk(0, 32, 0))], ["front", "above"], props=[mat()])
+
+# ── Dead bug and bird dog ──
+STRAIGHT_UP, LOW_LEG = fk(90, 4, 0), fk(15, 4, 0)
+figure("DEADBUG_STRAIGHT", [
+    supine(UP_ARM, UP_ARM, STRAIGHT_UP, STRAIGHT_UP),
+    supine(OVER, UP_ARM, STRAIGHT_UP, LOW_LEG),
+    supine(UP_ARM, UP_ARM, STRAIGHT_UP, STRAIGHT_UP),
+    supine(UP_ARM, OVER, LOW_LEG, STRAIGHT_UP),
+], ["side", "high"], props=[mat()], loop=True, ms=4000)
+
+def bird_crunch(arm, leg):
+    s = quad()
+    s[arm] = fk(25, 4, 120)
+    s[leg] = fk(95, 2, 120)
+    s["hip"] = (0, 20.3, 0)
+    return s
+figure("BIRDDOG_CRUNCH", [quad(), quad("armL", "legR"), bird_crunch("armL", "legR"), quad("armL", "legR")],
+       ["side", "high"], props=[mat()], loop=True, ms=4400)
+
+def superman(up):
+    return dict(pitch=90 - (8 if up else 0), hip=(0, 4.5, 0), anchor=("pelvis", (0, 4.5, 0), "y"), head=-15 if up else 0,
+                armL=fk(192 if up else 178, 12, 0), armR=fk(192 if up else 178, 12, 0),
+                legL=fk(-12 if up else 0, 3, 0), legR=fk(-12 if up else 0, 3, 0), feet="line")
+figure("SUPERMAN", [superman(False), superman(True)], ["side", "high"], props=[mat()])
+
+# ── Bag ──
+def hook(side):
+    s = boxing()
+    if side == "L":
+        s["armL"] = ik((-2, 67, BAG_Z - 10), (1, 0.1, 0), planted=False); s["yaw"] = -40
+    else:
+        s["armR"] = ik((2, 67, BAG_Z - 10), (-1, 0.1, 0), planted=False); s["yaw"] = 20; s["feetR"] = 10
+    return s
+figure("BAG_HOOKS", [boxing(), boxing(jab=True), boxing(), boxing(cross=True), boxing(), hook("L"), boxing(), hook("R")],
+       ["side", "back3q"], props=[bag(0, BAG_Z, 9, 32, 92)], loop=True, ms=3200)
+
+# ── Bear ──
+figure("BEAR_HOLD", [bear(0)], ["side", "high"], props=[mat()])
+def bear_side(step):
+    p = 90 - math.degrees(math.asin((26 - 22) / TORSO))
+    s = dict(pitch=p, hip=(5 * step, 22, 0), head=-15, feet="shin")
+    j = build(dict(s, hip=(0, 22, 0))).joints()
+    for side, sign in (("L", 1), ("R", -1)):
+        dx = (6 * step) if (step > 0) == (sign > 0) else 0
+        s["arm" + side] = ik((j["sh" + side][0] + 1.5 * sign + dx, 0, j["sh" + side][2]), (0, 0, -1), planted=False)
+        s["leg" + side] = ik((j["hip" + side][0] + dx, 5.5, j["hip" + side][2] - 15), (0, -0.3, 1), planted=False)
+    return s
+figure("BEAR_LATERAL", [bear_side(0), bear_side(1), bear_side(0), bear_side(-1)], ["front", "high"], props=[mat()], loop=True, ms=2800)
 
 
 # ───────────────────────────── frames, fitting, checks ─────────────────────────────

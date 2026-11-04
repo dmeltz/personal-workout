@@ -46,6 +46,8 @@ data class Variation(
     val how: String,
     val cues: List<String>,
     val sides: Sides? = null,
+    /** This variation's own stick figure in [Figures], when it differs from the exercise's. */
+    val figure: String? = null,
 )
 
 /**
@@ -80,6 +82,9 @@ data class Exercise(
     val unit: String get() = if (measure == Measure.REPS) "reps" else "s"
 
     fun sidesAt(variation: Int): Sides = variation(variation).sides ?: sides
+
+    /** The stick figure for a variation: its own, or the exercise's. */
+    fun figureAt(variation: Int): String = variation(variation).figure ?: figure
     fun perSide(variation: Int): Boolean = sidesAt(variation) != Sides.NONE
 
     /** "8 reps" or "8 reps per side". */
@@ -189,7 +194,8 @@ class Figure(
  * ```
  *
  * Optional lines: "sides: each" or "sides: alternate" (the target is then per side), "equipment: pull-up bar".
- * A variation can end with "| each", "| alternate" or "| none" when it differs from its exercise. Lines starting with "//" and blank lines are ignored.
+ * A variation can end with "| each", "| alternate" or "| none" when it differs from its exercise, and
+ * a "figure:" line after a variation gives that variation its own stick figure. Lines starting with "//" and blank lines are ignored.
  */
 object LibraryParser {
     private fun muscles(id: String, text: String): List<Muscle> =
@@ -215,14 +221,14 @@ object LibraryParser {
         val fields = mutableMapOf<String, String>()
         val cues = mutableListOf<String>()
         val variations = mutableListOf<Variation>()
-        var varName = ""; var varMin = 0; var varMax = 0; var varHow = ""; var varSides: Sides? = null
+        var varName = ""; var varMin = 0; var varMax = 0; var varHow = ""; var varSides: Sides? = null; var varFigure: String? = null
         val varCues = mutableListOf<String>()
         var inVariation = false
 
         fun flushVariation() {
             if (!inVariation) return
-            variations += Variation(varName, varMin, varMax, varHow, varCues.toList(), varSides)
-            varCues.clear(); inVariation = false
+            variations += Variation(varName, varMin, varMax, varHow, varCues.toList(), varSides, varFigure)
+            varCues.clear(); varFigure = null; inVariation = false
         }
 
         fun flushExercise() {
@@ -282,6 +288,7 @@ object LibraryParser {
                     varSides = parts.getOrNull(3)?.let { sides(id ?: "", it) ?: fail("sides must be each, alternate or none") }
                     inVariation = true
                 }
+                inVariation && line.startsWith("figure:") -> varFigure = line.substringAfter(":").trim()
                 line.startsWith("cue:") -> (if (inVariation) varCues else cues) += line.substringAfter(":").trim()
                 line.contains(":") -> {
                     val key = line.substringBefore(":").trim()

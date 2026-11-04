@@ -22,12 +22,17 @@ cue: Body in one straight line from head to heels: squeeze glutes and brace your
 cue: Hands a little wider than shoulders, elbows about 45° from your body, not flared out.
 cue: Lower until your chest is a fist from the floor, then push the floor away.
 variation: Incline push-up | 8-15 | Hands on a sturdy table, counter or windowsill. The higher the surface, the easier.
+figure: PUSHUP_INCLINE
 variation: Push-up | 6-15 | Hands on the floor.
+figure: PUSHUP
 cue: If your hips sag, rest and finish the set on a table instead.
 variation: Slow push-up | 6-12 | 3 seconds down, 1 second pause just above the floor, then push up.
+figure: PUSHUP_SLOW
 variation: Feet-elevated push-up | 6-12 | Feet on a chair or step, hands on the floor.
+figure: PUSHUP_FEET_UP
 cue: Keep your hips in line: the raised feet make them want to pike up.
 variation: Archer push-up | 3-6 | Hands very wide. Lower toward one hand while the other arm stays almost straight, then push up and lower toward the other hand. | alternate
+figure: ARCHER_PUSHUP
 
 @exercise PIKE
 title: Pike push-up
@@ -43,8 +48,11 @@ cue: Hips high so your body makes an upside-down V. Most of your weight goes on 
 cue: Lower the top of your head toward a spot a little in front of your hands, elbows pointing back, not out.
 cue: Push back up until your arms are straight. Shoulders do the work.
 variation: Pike push-up | 5-12 | Feet on the floor, walked in close to your hands.
+figure: PIKE
 variation: Slow pike push-up | 5-12 | 3 seconds down, then push up.
+figure: PIKE_SLOW
 variation: Feet-elevated pike push-up | 5-10 | Feet on a chair, hips stacked as high above your shoulders as you can.
+figure: PIKE_FEET_UP
 cue: Start with your knees bent if your hamstrings are tight.
 
 @exercise CLOSE_PUSHUP
@@ -61,8 +69,11 @@ cue: Hands shoulder-width or a little closer, directly under your shoulders.
 cue: Elbows brush your ribs on the way down. This moves the work to the triceps.
 cue: Body stays in one straight line, same as a normal push-up.
 variation: Close-grip incline push-up | 8-15 | Hands on a table or counter.
+figure: CLOSE_INCLINE
 variation: Close-grip push-up | 6-12 | Hands on the floor.
+figure: CLOSE_PUSHUP
 variation: Diamond push-up | 5-12 | Index fingers and thumbs touch to make a diamond under your chest.
+figure: DIAMOND_PUSHUP
 cue: If your wrists or elbows complain, go back to the close-grip version.
 
 // ───────────────────────────── PULL ─────────────────────────────
@@ -81,10 +92,14 @@ muscles: forearms lats | shoulders
 cue: Overhand grip, hands a little wider than your shoulders, thumbs around the bar.
 cue: Breathe normally. Stop the set when your grip starts to slip, not after.
 variation: Supported hang | 20-45 | Feet on a chair under the bar, carrying some of your weight.
+figure: HANG_SUPPORTED
 variation: Dead hang | 20-60 | Hang with your whole weight, arms straight and shoulders relaxed.
+figure: HANG_DEAD
 variation: Active hang | 20-50 | Pull your shoulders down away from your ears without bending your arms, and hold that.
+figure: HANG_ACTIVE
 cue: Your body rises a few centimeters when you pull your shoulders down. That's the move.
 variation: Flexed-arm hang | 10-30 | Jump or step up so your chin is over the bar, and hold it there.
+figure: HANG_FLEXED
 
 @exercise PULLUP
 title: Pull-up
@@ -101,11 +116,15 @@ cue: Overhand grip, a little wider than your shoulders.
 cue: Start each rep by pulling your shoulders down, then drive your elbows down toward your hips.
 cue: Lower all the way to straight arms under control. No swinging or kicking.
 variation: Scapular pull-up | 6-12 | Hang with straight arms and only pull your shoulders down and back, then relax. Small movement.
+figure: HANG_ACTIVE
 variation: Negative pull-up | 3-6 | Step up on a chair so your chin is over the bar, then lower yourself as slowly as you can, about 5 seconds.
+figure: PULLUP_NEGATIVE
 cue: Step back up for each rep. Don't jump into the next one.
 variation: Pull-up | 2-8 | Full pull-ups from a dead hang until your chin is over the bar.
+figure: PULLUP
 cue: Can't get one more full rep? Finish the set with slow negatives and log the full reps only.
 variation: Slow pull-up | 3-8 | 2 seconds up, a short pause with your chin over the bar, 3 seconds down.
+figure: PULLUP_SLOW
 
 @exercise CHINUP
 title: Chin-up
@@ -122,8 +141,11 @@ cue: Underhand grip (palms toward you), hands shoulder-width apart.
 cue: Pull your chest toward the bar, elbows close to your sides. Biceps work harder than in pull-ups.
 cue: Lower all the way to straight arms under control.
 variation: Negative chin-up | 3-6 | Step up on a chair with your chin over the bar, then lower yourself in about 5 seconds.
+figure: CHINUP_NEGATIVE
 variation: Chin-up | 2-8 | Full chin-ups from a dead hang.
+figure: CHINUP
 variation: Slow chin-up | 3-8 | 2 seconds up, a short pause at the top, 3 seconds down.
+figure: CHINUP_SLOW
 
 @exercise TOWEL_ROW
 title: Door towel row
@@ -141,9 +163,13 @@ cue: Feet close to the door, lean back with straight arms and a straight body.
 cue: Pull your chest toward the door, squeezing your shoulder blades together, then lower slowly.
 cue: Check that the door is closed and latched, and pull on its handle side only if it opens away from you.
 variation: Upright towel row | 8-15 | Lean back only a little. Walk your feet back to make it easier.
+figure: ROW_UPRIGHT
 variation: Towel row | 8-15 | Walk your feet closer to the door so you lean back further.
+figure: ROW
 variation: Slow towel row | 8-15 | Lean back as far as you control. Pause 2 seconds at the top of each rep.
+figure: ROW_SLOW
 variation: One-arm towel row | 5-10 | Hold both towel ends in one hand, other hand on your chest. | each
+figure: ROW_ONE_ARM
 
 // ───────────────────────────── LEGS ─────────────────────────────
 
@@ -161,10 +187,15 @@ cue: Feet shoulder-width, toes turned out a little. Arms forward for balance.
 cue: Sit back and down, knees pointing the same way as your toes. Keep your heels down.
 cue: Chest up, back neutral. Go as deep as you can while your heels stay down and your back stays straight.
 variation: Chair squat | 10-20 | Sit down to a chair, touch lightly without resting, and stand up.
+figure: CHAIR_SQUAT
 variation: Squat | 12-25 | Bodyweight squat, thighs at least parallel to the floor.
+figure: SQUAT
 variation: Pause squat | 10-20 | Hold the bottom position 3 seconds on every rep.
+figure: SQUAT_PAUSE
 variation: Cossack squat | 3-6 | Very wide stance. Sit down over one leg while the other stays straight, toes up, then shift across to the other leg. | alternate
+figure: COSSACK
 variation: Assisted pistol squat | 3-8 | On one leg, holding the door frame lightly. Sit back to a low chair. | each
+figure: PISTOL
 
 @exercise SPLIT_SQUAT
 title: Split squat
@@ -181,10 +212,14 @@ cue: Long stride: front foot flat, back heel up. Most of your weight on the fron
 cue: Lower straight down until your back knee almost touches the floor. Torso upright.
 cue: Front knee follows the toes. Push up through the front heel.
 variation: Supported split squat | 8-15 | Hold a wall or chair for balance.
+figure: SPLIT_SUPPORTED
 variation: Split squat | 8-15 | No support.
+figure: SPLIT
 variation: Bulgarian split squat | 6-12 | Back foot on a chair or couch behind you.
+figure: BULGARIAN
 cue: Hop your front foot forward if your front knee travels far past your toes.
 variation: Slow Bulgarian split squat | 6-12 | Back foot raised, 3 seconds down every rep.
+figure: BULGARIAN_SLOW
 
 @exercise GLUTE_BRIDGE
 title: Glute bridge
@@ -200,8 +235,11 @@ cue: Lie on your back, knees bent, feet flat near your hips.
 cue: Push through your heels and lift your hips until your body is straight from knees to shoulders.
 cue: Squeeze your glutes at the top for a second. Don't arch your lower back.
 variation: Glute bridge | 12-25 | Both feet on the floor.
+figure: BRIDGE
 variation: Single-leg glute bridge | 8-15 | One foot on the floor, the other leg straight up or held to your chest. | each
+figure: BRIDGE_ONE_LEG
 variation: Single-leg hip thrust | 8-15 | Shoulders on the couch or a chair, one foot on the floor. | each
+figure: HIP_THRUST
 
 @exercise CALF_RAISE
 title: Calf raise
@@ -216,8 +254,11 @@ muscles: calves
 cue: Rise all the way up onto the balls of your feet, pause, then lower slowly.
 cue: Hold a wall or door frame lightly for balance only.
 variation: Calf raise | 15-30 | Both feet, on flat ground.
+figure: CALF
 variation: Calf raise on a step | 12-25 | Balls of your feet on a step, heels lower below the step at the bottom.
+figure: CALF_STEP
 variation: Single-leg calf raise | 10-20 | One foot on the step. | each
+figure: CALF_ONE_LEG
 
 @exercise STEP_UP
 title: Step-up
@@ -235,8 +276,11 @@ cue: Whole foot on the step. Push through that heel to stand up tall.
 cue: Don't push off with the back foot: let it hang and just tap the step at the top.
 cue: Lower slowly back down with the same leg.
 variation: Low step-up | 10-15 | A stair or step about knee-low.
+figure: STEPUP_LOW
 variation: High step-up | 8-15 | A chair or bench about knee height.
+figure: STEPUP
 variation: Slow high step-up | 8-12 | Knee-high step, 3 seconds on the way down.
+figure: STEPUP_SLOW
 
 // ───────────────────────────── CORE ─────────────────────────────
 
@@ -254,9 +298,13 @@ cue: Elbows under your shoulders, body in one straight line.
 cue: Squeeze your glutes and pull your belly button in. Don't let your hips sag or pike up.
 cue: Breathe normally throughout.
 variation: Knee plank | 20-45 | Knees on the floor instead of feet.
+figure: KNEE_PLANK
 variation: Plank | 20-60 | On forearms and toes.
+figure: PLANK_HOLD
 variation: Long-lever plank | 20-45 | Elbows a hand's length further forward than your shoulders.
+figure: LONG_PLANK
 variation: Plank with leg lift | 20-45 | Lift one foot a few centimeters, swapping every 5 seconds, hips level.
+figure: PLANK_LEG_LIFT
 
 @exercise SIDE_PLANK
 title: Side plank
@@ -272,8 +320,11 @@ muscles: obliques | abs shoulders
 cue: Elbow right under your shoulder. Body in a straight line from head to feet.
 cue: Push your hips up and slightly forward. Don't let them drop toward the floor.
 variation: Knee side plank | 15-40 | Knees bent and on the floor.
+figure: KNEE_SIDEPLANK
 variation: Side plank | 15-45 | Feet stacked, or one in front of the other for balance.
+figure: SIDEPLANK
 variation: Side plank with top leg raised | 15-30 | Lift the top leg and hold it up.
+figure: SIDEPLANK_LEG
 
 @exercise DEAD_BUG
 title: Dead bug
@@ -290,8 +341,11 @@ cue: Lie on your back, arms straight up, knees bent at 90° above your hips.
 cue: Press your lower back into the floor and keep it there the whole time.
 cue: Slowly extend the opposite arm and leg toward the floor, return, and switch to the other pair.
 variation: Dead bug | 4-8 | Opposite arm and leg, slow and controlled.
+figure: DEADBUG
 variation: Slow dead bug | 4-8 | Take 3 seconds to extend, breathe out fully as you do.
+figure: DEADBUG_SLOW
 variation: Straight-leg dead bug | 4-7 | Legs start straight up toward the ceiling.
+figure: DEADBUG_STRAIGHT
 
 @exercise BIRD_DOG
 title: Bird dog
@@ -308,8 +362,11 @@ cue: On hands and knees, hands under shoulders, knees under hips, back flat.
 cue: Reach one arm forward and the opposite leg back until both are level with your body.
 cue: Hips stay square to the floor. Hold 2 seconds, return, and switch to the other pair.
 variation: Bird dog | 4-8 | Slow, with a 2-second hold.
+figure: BIRDDOG
 variation: Bird dog with elbow-to-knee | 4-7 | After the reach, bring elbow and knee together under your body, then reach again.
+figure: BIRDDOG_CRUNCH
 variation: Superman | 8-15 | Lie face down and lift your arms, chest and legs a little off the floor. Hold 2 seconds. | none
+figure: SUPERMAN
 
 @exercise KNEE_RAISE
 title: Hanging knee raise
@@ -325,9 +382,13 @@ muscles: abs | forearms obliques
 cue: Hang with your shoulders pulled down a little, not shrugged up to your ears.
 cue: Raise your knees by curling your pelvis up, not by swinging. Lower slowly.
 variation: Lying knee tuck | 10-20 | On your back, hands by your sides. Bring your knees to your chest and lift your hips slightly.
+figure: LYING_TUCK
 variation: Hanging knee raise | 6-15 | From the bar, knees up to hip height.
+figure: KNEERAISE
 variation: Hanging knee-to-chest | 6-12 | Knees all the way up toward your chest, curling your pelvis.
+figure: KNEE_TO_CHEST
 variation: Hanging leg raise | 5-12 | Straight legs up to hip height.
+figure: LEG_RAISE
 
 // ───────────────────────────── CONDITIONING ─────────────────────────────
 
@@ -346,8 +407,11 @@ cue: Stand side-on, hands up guarding your chin, knees soft. Keep moving your fe
 cue: Punch with your whole body: turn your hip and shoulder into it, and bring the hand straight back to your face.
 cue: Breathe out on every punch. Wrap or glove your hands so your wrists stay straight.
 variation: Steady round | 30-60 | Jab and cross at a steady pace.
+figure: BAG
 variation: Moving round | 30-75 | Jab, cross and hooks, moving around the bag.
+figure: BAG_HOOKS
 variation: Power round | 30-60 | Hard combinations of 3-4 punches, short rest inside the round.
+figure: BAG_HOOKS
 
 @exercise BEAR_CRAWL
 title: Bear crawl
@@ -363,8 +427,11 @@ cue: On hands and feet, knees bent and hovering a few centimeters above the grou
 cue: Back flat and hips low, about level with your shoulders.
 cue: Move the opposite hand and foot together, small steps. On grass if you can.
 variation: Bear hold | 15-40 | Hold the position without moving.
+figure: BEAR_HOLD
 variation: Bear crawl | 15-45 | Crawl forward and back.
+figure: BEAR
 variation: Lateral bear crawl | 15-45 | Crawl sideways, both directions.
+figure: BEAR_LATERAL
 
 // ───────────────────────────── WARM-UP ─────────────────────────────
 

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -21,9 +22,11 @@ import androidx.compose.ui.unit.dp
 import com.dmeltz.personalworkout.core.AppState
 import com.dmeltz.personalworkout.core.Effort
 import com.dmeltz.personalworkout.core.Exercise
+import com.dmeltz.personalworkout.core.Figures
 import com.dmeltz.personalworkout.core.Measure
 import com.dmeltz.personalworkout.core.Progression
 import com.dmeltz.personalworkout.core.WorkoutRecord
+import com.dmeltz.personalworkout.core.views
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -38,7 +41,8 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(exercise.group.label, style = MaterialTheme.typography.labelLarge)
-            FigureViews(exercise.figure, 170.dp)
+            // The figure for the variation you are on (or will start with).
+            FigureViews(exercise.figureAt(s?.variation ?: exercise.start), 170.dp)
             ExerciseMuscles(exercise)
             if (s != null) {
                 Text(
@@ -59,14 +63,20 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     exercise.variations.forEachIndexed { i, v ->
                         val current = s?.variation == i
-                        Column {
-                            Text(
-                                "${i + 1}. ${v.name}  (${v.min}–${exercise.amount(i, v.max)})" + if (current) "  ← you are here" else "",
-                                fontWeight = if (current) FontWeight.Bold else FontWeight.Normal,
-                                color = if (current) color else MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(v.how, style = MaterialTheme.typography.bodySmall)
-                            v.cues.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            // Each variation's own figure, in its main view.
+                            Figures.views(exercise.figureAt(i)).firstOrNull()?.let { f ->
+                                StickFigure(f, Modifier.width(84.dp).height(84.dp))
+                            }
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "${i + 1}. ${v.name}  (${v.min}–${exercise.amount(i, v.max)})" + if (current) "  ← you are here" else "",
+                                    fontWeight = if (current) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (current) color else MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(v.how, style = MaterialTheme.typography.bodySmall)
+                                v.cues.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+                            }
                         }
                     }
                 }
