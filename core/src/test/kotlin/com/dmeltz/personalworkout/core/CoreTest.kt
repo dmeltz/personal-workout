@@ -20,8 +20,11 @@ class CoreTest {
         for (e in library.exercises) {
             assertNotNull(Figures.all[e.figure], "${e.id} has no figure ${e.figure}")
             assertTrue(e.cues.size >= 2, "${e.id} needs form cues")
+            assertTrue(e.primary.isNotEmpty(), "${e.id} needs its main muscles")
             assertTrue(e.variations.all { it.how.isNotBlank() }, "${e.id} has a variation without a description")
         }
+        val covered = library.exercises.flatMap { it.primary }.toSet()
+        assertEquals(Muscle.entries.toSet(), covered, "every muscle on the map is some exercise's main target")
         assertTrue(library.warmup.isNotEmpty())
         for (m in library.warmup) assertNotNull(m.figure?.let { Figures.all[it] }, "warm-up ${m.name} has no figure")
         for (f in Figures.all.values) if (f.front) assertTrue(Prop.Front in f.props)
@@ -182,5 +185,24 @@ class BodyTest {
         s = Body.logWeight(Body.logWeight(s, 108, 76.6), 108, 76.4)
         assertEquals(2, s.weights.size)
         assertEquals(0.4, Body.change(s, 108, 7)!!, 1e-9)
+    }
+}
+
+class MuscleTest {
+    private val lib = LibraryParser.parse(java.io.File("../app/src/main/assets/exercises.txt").readText())
+
+    @Test
+    fun muscleStatus() {
+        val push = lib.exercise("PUSHUP")!!
+        var state = AppState(exercises = mapOf("PUSHUP" to Progression.initial(push, 100)))
+        kotlin.test.assertNotNull(Progression.muscleLevel(lib, state, Muscle.CHEST))
+        kotlin.test.assertNull(Progression.muscleLevel(lib, state, Muscle.QUADS))
+        kotlin.test.assertNull(Progression.muscleLastWorked(lib, state, Muscle.ABS))
+        state = state.copy(exercises = mapOf("PUSHUP" to Progression.initial(push, 100).copy(lastDone = 105)))
+        kotlin.test.assertEquals(105L, Progression.muscleLastWorked(lib, state, Muscle.ABS))
+        val m = Progression.musclesOf(listOf(push, lib.exercise("PLANK")!!))
+        kotlin.test.assertEquals(true, m[Muscle.ABS])
+        kotlin.test.assertEquals(true, m[Muscle.CHEST])
+        kotlin.test.assertEquals(false, m[Muscle.OBLIQUES])
     }
 }

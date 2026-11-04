@@ -213,6 +213,26 @@ object Progression {
         return if (levels.isEmpty()) null else levels.average()
     }
 
+    /** Average level of the started exercises that work [muscle] as a primary mover, or null before any start. */
+    fun muscleLevel(library: Library, state: AppState, muscle: Muscle): Double? {
+        val levels = library.exercises.filter { muscle in it.primary }
+            .mapNotNull { ex -> state.exerciseState(ex.id)?.let { level(ex, it) } }
+        return if (levels.isEmpty()) null else levels.average()
+    }
+
+    /** The last day an exercise worked [muscle] (as primary or secondary), or null if never. */
+    fun muscleLastWorked(library: Library, state: AppState, muscle: Muscle): Day? =
+        library.exercises.filter { muscle in it.primary || muscle in it.secondary }
+            .mapNotNull { state.exerciseState(it.id)?.lastDone?.takeIf { d -> d >= 0 } }
+            .maxOrNull()
+
+    /** The muscles a list of exercises works: primary for any of them wins over secondary. */
+    fun musclesOf(exercises: List<Exercise>): Map<Muscle, Boolean> {
+        val primary = exercises.flatMap { it.primary }.toSet()
+        val secondary = exercises.flatMap { it.secondary }.toSet() - primary
+        return primary.associateWith { true } + secondary.associateWith { false }
+    }
+
     /** Average of the group levels, or null before any exercise starts. */
     fun overallLevel(library: Library, state: AppState): Double? {
         val groups = Group.entries.mapNotNull { groupLevel(library, state, it) }

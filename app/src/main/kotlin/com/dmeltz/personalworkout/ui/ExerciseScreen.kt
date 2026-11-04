@@ -39,6 +39,7 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
         ) {
             Text(exercise.group.label, style = MaterialTheme.typography.labelLarge)
             FigureViews(exercise.figure, 170.dp)
+            ExerciseMuscles(exercise)
             if (s != null) {
                 Text(
                     "Level %.2f · now ${s.sets} × ${s.target} $unit".format(Progression.level(exercise, s)),

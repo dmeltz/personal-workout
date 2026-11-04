@@ -16,6 +16,7 @@ rest: 60
 start: 2
 intro: 1
 figure: PUSHUP
+muscles: chest triceps shoulders | abs
 cue: Body in one straight line from head to heels: squeeze glutes and brace your belly.
 cue: Hands a little wider than shoulders, elbows about 45° from your body, not flared out.
 cue: Lower until your chest is a fist from the floor, then push the floor away.
@@ -36,6 +37,7 @@ rest: 60
 start: 1
 intro: 2
 figure: PIKE
+muscles: shoulders triceps | upper_back
 cue: Hips high so your body makes an upside-down V. Most of your weight goes on your hands.
 cue: Lower the top of your head toward a spot a little in front of your hands, elbows pointing back, not out.
 cue: Push back up until your arms are straight. Shoulders do the work.
@@ -53,6 +55,7 @@ rest: 60
 start: 1
 intro: 4
 figure: PUSHUP
+muscles: triceps chest | shoulders abs
 cue: Hands shoulder-width or a little closer, directly under your shoulders.
 cue: Elbows brush your ribs on the way down. This moves the work to the triceps.
 cue: Body stays in one straight line, same as a normal push-up.
@@ -73,6 +76,7 @@ start: 2
 intro: 1
 equipment: pull-up bar
 figure: HANG
+muscles: forearms lats | shoulders
 cue: Overhand grip, hands a little wider than your shoulders, thumbs around the bar.
 cue: Breathe normally. Stop the set when your grip starts to slip, not after.
 variation: Supported hang | 20-45 | Feet on a chair under the bar, carrying some of your weight.
@@ -91,6 +95,7 @@ start: 2
 intro: 1
 equipment: pull-up bar
 figure: PULLUP
+muscles: lats upper_back biceps | forearms abs
 cue: Overhand grip, a little wider than your shoulders.
 cue: Start each rep by pulling your shoulders down, then drive your elbows down toward your hips.
 cue: Lower all the way to straight arms under control. No swinging or kicking.
@@ -111,6 +116,7 @@ start: 1
 intro: 3
 equipment: pull-up bar
 figure: PULLUP
+muscles: biceps lats | upper_back forearms
 cue: Underhand grip (palms toward you), hands shoulder-width apart.
 cue: Pull your chest toward the bar, elbows close to your sides. Biceps work harder than in pull-ups.
 cue: Lower all the way to straight arms under control.
@@ -128,6 +134,7 @@ start: 1
 intro: 2
 equipment: a towel and a sturdy door
 figure: ROW
+muscles: upper_back lats biceps | forearms lower_back
 cue: Loop a towel around both handles of a closed door (or a post in the yard). Hold one end in each hand.
 cue: Feet close to the door, lean back with straight arms and a straight body.
 cue: Pull your chest toward the door, squeezing your shoulder blades together, then lower slowly.
@@ -148,6 +155,7 @@ rest: 60
 start: 2
 intro: 1
 figure: SQUAT
+muscles: quads glutes | hamstrings lower_back
 cue: Feet shoulder-width, toes turned out a little. Arms forward for balance.
 cue: Sit back and down, knees pointing the same way as your toes. Keep your heels down.
 cue: Chest up, back neutral. Go as deep as you can while your heels stay down and your back stays straight.
@@ -167,6 +175,7 @@ start: 2
 intro: 2
 per side: yes
 figure: SPLIT
+muscles: quads glutes | hamstrings calves
 cue: Long stride: front foot flat, back heel up. Most of your weight on the front leg.
 cue: Lower straight down until your back knee almost touches the floor. Torso upright.
 cue: Front knee follows the toes. Push up through the front heel.
@@ -185,6 +194,7 @@ rest: 45
 start: 2
 intro: 1
 figure: BRIDGE
+muscles: glutes hamstrings | lower_back
 cue: Lie on your back, knees bent, feet flat near your hips.
 cue: Push through your heels and lift your hips until your body is straight from knees to shoulders.
 cue: Squeeze your glutes at the top for a second. Don't arch your lower back.
@@ -202,6 +212,7 @@ rest: 45
 start: 1
 intro: 3
 figure: CALF
+muscles: calves
 cue: Rise all the way up onto the balls of your feet, pause, then lower slowly.
 cue: Hold a wall or door frame lightly for balance only.
 variation: Calf raise | 15-30 | Both feet, on flat ground.
@@ -218,6 +229,7 @@ start: 1
 intro: 4
 per side: yes
 figure: STEPUP
+muscles: quads glutes | calves
 equipment: a sturdy step, bench or chair
 cue: Whole foot on the step. Push through that heel to stand up tall.
 cue: Don't push off with the back foot: let it hang and just tap the step at the top.
@@ -237,6 +249,7 @@ rest: 45
 start: 2
 intro: 1
 figure: PLANK
+muscles: abs | shoulders obliques
 cue: Elbows under your shoulders, body in one straight line.
 cue: Squeeze your glutes and pull your belly button in. Don't let your hips sag or pike up.
 cue: Breathe normally throughout.
@@ -255,6 +268,7 @@ start: 1
 intro: 2
 per side: yes
 figure: SIDEPLANK
+muscles: obliques | abs shoulders
 cue: Elbow right under your shoulder. Body in a straight line from head to feet.
 cue: Push your hips up and slightly forward. Don't let them drop toward the floor.
 variation: Knee side plank | 15-40 | Knees bent and on the floor.
@@ -270,6 +284,7 @@ rest: 30
 start: 1
 intro: 1
 figure: DEADBUG
+muscles: abs | obliques
 cue: Lie on your back, arms straight up, knees bent at 90° above your hips.
 cue: Press your lower back into the floor and keep it there the whole time.
 cue: Slowly extend the opposite arm and leg toward the floor, return, and switch. Each side is one rep.
@@ -286,6 +301,7 @@ rest: 30
 start: 1
 intro: 3
 figure: BIRDDOG
+muscles: lower_back glutes | abs shoulders
 cue: On hands and knees, hands under shoulders, knees under hips, back flat.
 cue: Reach one arm forward and the opposite leg back until both are level with your body.
 cue: Hips stay square to the floor. Hold 2 seconds, return, switch. Each side is one rep.
@@ -303,6 +319,7 @@ start: 1
 intro: 2
 equipment: pull-up bar
 figure: KNEERAISE
+muscles: abs | forearms obliques
 cue: Hang with your shoulders pulled down a little, not shrugged up to your ears.
 cue: Raise your knees by curling your pelvis up, not by swinging. Lower slowly.
 variation: Lying knee tuck | 10-20 | On your back, hands by your sides. Bring your knees to your chest and lift your hips slightly.
@@ -322,6 +339,7 @@ start: 1
 intro: 2
 equipment: boxing bag
 figure: BAG
+muscles: shoulders | obliques chest triceps
 cue: Stand side-on, hands up guarding your chin, knees soft. Keep moving your feet.
 cue: Punch with your whole body: turn your hip and shoulder into it, and bring the hand straight back to your face.
 cue: Breathe out on every punch. Wrap or glove your hands so your wrists stay straight.
@@ -338,6 +356,7 @@ rest: 45
 start: 1
 intro: 4
 figure: BEAR
+muscles: shoulders abs | quads
 cue: On hands and feet, knees bent and hovering a few centimeters above the ground.
 cue: Back flat and hips low, about level with your shoulders.
 cue: Move the opposite hand and foot together, small steps. On grass if you can.
