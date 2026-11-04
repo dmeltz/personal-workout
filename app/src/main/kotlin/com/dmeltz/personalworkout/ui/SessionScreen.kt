@@ -259,7 +259,7 @@ fun SessionScreen(
                             ex, es, position, planned, history.filter { it.exerciseId == ex.id && it.day != day },
                             readAloud = state.readAloud,
                             speak = speaker::say,
-                            speaking = { speaker.speaking },
+                            cue = speaker::interject,
                         ) { sets, effort ->
                             speaker.stop()
                             log(ex, es, sets, effort)
@@ -409,8 +409,8 @@ private fun ExerciseView(
     previous: List<WorkoutRecord>,
     readAloud: Boolean,
     speak: (String) -> Unit,
-    /** Whether the instructions are still being read. */
-    speaking: () -> Boolean,
+    /** Reads a short cue now; instructions still being read carry on after it. */
+    cue: (String) -> Unit,
     onLog: (List<Int>, Effort) -> Unit,
 ) {
     val v = ex.variation(es.variation)
@@ -436,8 +436,9 @@ private fun ExerciseView(
     LaunchedEffect(step) {
         if (!readAloud) return@LaunchedEffect
         when {
-            step == feelStep -> speak("How did it feel?")
-            step >= 0 && step % 2 == 0 -> speak("Set ${step / 2 + 1}. Go.")
+            step == feelStep -> cue("Feedback")
+            step >= 0 && step % 2 == 0 -> cue("Start set ${step / 2 + 1}")
+            step > 0 -> cue("Rest")
         }
     }
 
@@ -462,7 +463,7 @@ private fun ExerciseView(
     if (es.times == 0) PipSays(Mood.CALM, Mascot.newExercise(), size = 48.dp)
     Text(v.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
     if (v.name != ex.title) Text(ex.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.outline)
-    if (step == INTRO) IntroCountdown(speaking) { step = 0 }
+    if (step == INTRO) IntroCountdown { step = 0 }
     ex.figureAt(es.variation).let { name -> key(name) { FigureViews(name, 190.dp) } }
     Text(v.how, style = MaterialTheme.typography.bodyLarge)
     TextButton(onClick = { speak(spoken) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
@@ -569,27 +570,22 @@ private const val INTRO = -1
 private const val FEEL_SECONDS = 5
 
 /**
- * About 10 seconds to read the instructions, then the first set starts. If they are still being
- * read aloud, it waits for them to finish, for up to half a minute more.
+ * About 10 seconds to read the instructions, then the first set starts. Instructions still being
+ * read aloud carry on during the set.
  */
 @Composable
-private fun IntroCountdown(speaking: () -> Boolean, onDoneClick: () -> Unit) {
+private fun IntroCountdown(onDoneClick: () -> Unit) {
     val paused = LocalPaused.current
     val onDone by rememberUpdatedState(onDoneClick)
     var left by remember { mutableIntStateOf(INTRO_SECONDS) }
-    var waiting by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         while (left > 0) { tick(paused); left-- }
-        waiting = true
-        var waited = 0
-        while (speaking() && waited < 60) { delay(500); waited++ }
-        while (paused.value) delay(200)
         beep()
         onDone()
     }
     StepCard(highlight = true) {
         Text(
-            if (waiting) "Finishing the instructions…" else "Read the instructions. Starting in $left s",
+            "Read the instructions. Set 1 starts in $left s",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f).padding(vertical = 8.dp),
         )
