@@ -34,7 +34,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberUpdatedState
@@ -71,6 +74,16 @@ import com.dmeltz.personalworkout.core.WorkoutRecord
 import com.dmeltz.personalworkout.today
 import kotlinx.coroutines.delay
 
+/** Whether the workout is paused. Every countdown stops while it is. */
+private val LocalPaused = staticCompositionLocalOf<State<Boolean>> { mutableStateOf(false) }
+
+/** Waits one second of workout time: time doesn't pass while [paused]. */
+private suspend fun tick(paused: State<Boolean>) {
+    while (paused.value) delay(200)
+    delay(1000)
+    while (paused.value) delay(200)
+}
+
 @Composable
 fun SessionScreen(
     library: Library,
@@ -97,6 +110,7 @@ fun SessionScreen(
     // Everything logged on this screen, with what is needed to correct it on the summary.
     val logged = remember { mutableStateListOf<Logged>() }
     val speaker = rememberSpeaker()
+    val paused = remember { mutableStateOf(false) }
 
     // The overall clock: from the session's start (or this screen's, for a session saved before
     // start times were kept) until it is finished.
@@ -204,13 +218,27 @@ fun SessionScreen(
                 modifier = Modifier.padding(start = 10.dp),
             )
             SessionClock(startedAt, endedAt, Modifier.padding(start = 12.dp))
+            // Pause and continue: every countdown stops while paused.
+            if (!done) {
+                TextButton(onClick = {
+                    paused.value = !paused.value
+                    if (paused.value) speaker.stop()
+                }) { Text(if (paused.value) "▶" else "⏸", fontSize = 18.sp) }
+            }
             // Read-aloud on or off.
             TextButton(onClick = {
                 if (state.readAloud) speaker.stop()
                 update(state.copy(readAloud = !state.readAloud))
             }) { Text(if (state.readAloud) "🔊" else "🔇", fontSize = 18.sp) }
         }
-        Column(
+        if (paused.value && !done) {
+            Button(
+                onClick = { paused.value = false },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Good, contentColor = Color(0xFF0B1B3A)),
+            ) { Text("Paused. Tap to continue", fontWeight = FontWeight.Bold) }
+        }
+        CompositionLocalProvider(LocalPaused provides paused) { Column(
             Modifier.fillMaxSize().verticalScroll(scroll).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -239,7 +267,7 @@ fun SessionScreen(
                     }
                 }
             }
-        }
+        } }
     }
 }
 
@@ -283,7 +311,7 @@ private fun TodaysPlan(exercises: List<Exercise>, warmup: List<WarmupMove>, stat
                 PlanRow("${i + 1}. ${ex.variation(es.variation).name}", "${es.sets} × ${ex.amount(es.variation, es.target)}", seconds)
             }
             Text(
-                "Times include the rests between sets. Once the warm-up is done, the workout runs by itself.",
+                "Times include the rests between sets. Once the warm-up is done, the workout runs by itself. ⏸ at the top pauses it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
@@ -322,6 +350,7 @@ fun ExerciseMuscles(ex: Exercise) {
 
 @Composable
 private fun WarmupView(moves: List<WarmupMove>, speak: (String) -> Unit, onDoneClick: () -> Unit) {
+    val paused = LocalPaused.current
     val onDone by rememberUpdatedState(onDoneClick)
     var index by remember { mutableIntStateOf(-1) }
     var left by remember { mutableIntStateOf(0) }
@@ -331,7 +360,7 @@ private fun WarmupView(moves: List<WarmupMove>, speak: (String) -> Unit, onDoneC
         left = moves[index].seconds
         speak(moves[index].name)
         while (left > 0) {
-            delay(1000)
+            tick(paused)
             left--
             if (left in 1..2) beep(short = true)
         }
@@ -394,6 +423,16 @@ private fun ExerciseView(
     // then how it felt. Even steps are sets, odd ones the rests between them.
     var step by remember(ex.id) { mutableIntStateOf(INTRO) }
     val feelStep = 2 * es.sets - 1
+    // About 5 seconds to say how it felt; with no answer it is logged as OK and the workout moves on.
+    val paused = LocalPaused.current
+    var feelLeft by remember(ex.id) { mutableIntStateOf(FEEL_SECONDS) }
+    val log by rememberUpdatedState(onLog)
+    LaunchedEffect(step == feelStep) {
+        if (step != feelStep) return@LaunchedEffect
+        feelLeft = FEEL_SECONDS
+        while (feelLeft > 0) { tick(paused); feelLeft-- }
+        log(sets.toList(), Effort.OK)
+    }
     LaunchedEffect(step) {
         if (!readAloud) return@LaunchedEffect
         when {
@@ -505,6 +544,13 @@ private fun ExerciseView(
         EffortButton("OK", Brand, Modifier.weight(1f)) { onLog(sets.toList(), Effort.OK) }
         EffortButton("Hard", Color(0xFFFFB066), Modifier.weight(1f)) { onLog(sets.toList(), Effort.HARD) }
     }
+    if (step == feelStep) {
+        Text(
+            "Tap how it felt. Moving on as OK in $feelLeft s.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Good,
+        )
+    }
     OutlinedButton(onClick = { onLog(emptyList(), Effort.SKIPPED) }, modifier = Modifier.fillMaxWidth()) {
         Text("Skip / couldn't do it")
     }
@@ -519,6 +565,8 @@ private fun ExerciseView(
 /** Seconds to read the instructions before the first set. */
 private const val INTRO_SECONDS = 10
 private const val INTRO = -1
+/** Seconds to say how an exercise felt before it is logged as OK. */
+private const val FEEL_SECONDS = 5
 
 /**
  * About 10 seconds to read the instructions, then the first set starts. If they are still being
@@ -526,14 +574,16 @@ private const val INTRO = -1
  */
 @Composable
 private fun IntroCountdown(speaking: () -> Boolean, onDoneClick: () -> Unit) {
+    val paused = LocalPaused.current
     val onDone by rememberUpdatedState(onDoneClick)
     var left by remember { mutableIntStateOf(INTRO_SECONDS) }
     var waiting by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        while (left > 0) { delay(1000); left-- }
+        while (left > 0) { tick(paused); left-- }
         waiting = true
         var waited = 0
         while (speaking() && waited < 60) { delay(500); waited++ }
+        while (paused.value) delay(200)
         beep()
         onDone()
     }
@@ -574,6 +624,7 @@ private fun SetRow(
     onChange: (Int) -> Unit,
 ) {
     val running = active && measure == Measure.SECONDS
+    val paused = LocalPaused.current
     var left by remember { mutableIntStateOf(0) }
     // For a timed hold on each side: 1 while on the first side, 2 on the second.
     var side by remember { mutableIntStateOf(1) }
@@ -586,7 +637,7 @@ private fun SetRow(
             side = s
             left = value
             while (left > 0) {
-                delay(1000)
+                tick(paused)
                 left--
                 if (left in 1..2) beep(short = true)
             }
@@ -595,7 +646,7 @@ private fun SetRow(
                 // A few seconds to switch sides before the second hold.
                 left = 5
                 side = 0
-                while (left > 0) { delay(1000); left-- }
+                while (left > 0) { tick(paused); left-- }
             }
         }
         side = 1
@@ -645,6 +696,7 @@ private fun SetRow(
 /** The rest between two sets, shown like a set, with the same countdown beeps. It runs while [active]. */
 @Composable
 private fun RestRow(seconds: Int, active: Boolean, onEnd: () -> Unit) {
+    val paused = LocalPaused.current
     val running = active
     val end by rememberUpdatedState(onEnd)
     var left by remember { mutableIntStateOf(seconds) }
@@ -652,7 +704,7 @@ private fun RestRow(seconds: Int, active: Boolean, onEnd: () -> Unit) {
         if (!running) return@LaunchedEffect
         left = seconds
         while (left > 0) {
-            delay(1000)
+            tick(paused)
             left--
             if (left in 1..2) beep(short = true)
         }
