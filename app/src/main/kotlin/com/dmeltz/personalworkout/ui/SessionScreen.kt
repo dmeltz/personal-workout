@@ -1,5 +1,8 @@
 package com.dmeltz.personalworkout.ui
 
+import android.speech.tts.TextToSpeech
+import java.util.Locale
+
 import android.media.AudioManager
 import android.media.ToneGenerator
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +23,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -107,7 +110,7 @@ fun SessionScreen(
         }
     }
 
-    fun log(ex: Exercise, before: ExerciseState, sets: List<Int>, effort: Effort, unclear: Boolean) {
+    fun log(ex: Exercise, before: ExerciseState, sets: List<Int>, effort: Effort) {
         val current = state.activeSession ?: return
         val next = Sessions.log(state, ex, sets, effort, day)
         val after = next.exerciseState(ex.id) ?: return
@@ -133,7 +136,6 @@ fun SessionScreen(
                 nextTarget = after.target,
                 nextSets = after.sets,
                 capoeiraDay = state.isCapoeira(day),
-                unclear = unclear,
             ),
         )
         lastMessage = if (after.variation > before.variation) {
@@ -179,8 +181,8 @@ fun SessionScreen(
                     val es = state.exerciseState(ex.id) ?: Progression.initial(ex, day)
                     lastMessage?.let { PipSays(Mood.HAPPY, it, size = 48.dp) }
                     key(ex.id, position) {
-                        ExerciseView(ex, es, position, planned, history.filter { it.exerciseId == ex.id && it.day != day }) { sets, effort, unclear ->
-                            log(ex, es, sets, effort, unclear)
+                        ExerciseView(ex, es, position, planned, history.filter { it.exerciseId == ex.id && it.day != day }) { sets, effort ->
+                            log(ex, es, sets, effort)
                         }
                     }
                 }
@@ -226,9 +228,19 @@ private fun WarmupView(moves: List<WarmupMove>, onDoneClick: () -> Unit) {
     val onDone by rememberUpdatedState(onDoneClick)
     var index by remember { mutableIntStateOf(-1) }
     var left by remember { mutableIntStateOf(0) }
+    // Each move's name is read aloud as it starts, so the phone can stay on the grass.
+    val context = LocalContext.current
+    val tts = remember { arrayOfNulls<TextToSpeech>(1) }
+    DisposableEffect(Unit) {
+        tts[0] = TextToSpeech(context.applicationContext) { status ->
+            if (status == TextToSpeech.SUCCESS) tts[0]?.language = Locale.US
+        }
+        onDispose { tts[0]?.shutdown() }
+    }
     LaunchedEffect(index) {
         if (index !in moves.indices) return@LaunchedEffect
         left = moves[index].seconds
+        tts[0]?.speak(moves[index].name, TextToSpeech.QUEUE_FLUSH, null, "move$index")
         while (left > 0) {
             delay(1000)
             left--
@@ -277,11 +289,10 @@ private fun ExerciseView(
     position: Int,
     planned: Int,
     previous: List<WorkoutRecord>,
-    onLog: (List<Int>, Effort, Boolean) -> Unit,
+    onLog: (List<Int>, Effort) -> Unit,
 ) {
     val v = ex.variation(es.variation)
     val sets = remember(ex.id) { mutableStateListOf<Int>().apply { repeat(es.sets) { add(es.target) } } }
-    var unclear by remember(ex.id) { mutableStateOf(false) }
     val side = if (ex.perSide) " per side" else ""
 
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -349,17 +360,13 @@ private fun ExerciseView(
         if (i > 0) RestRow(ex.rest)
         SetRow(i + 1, value, ex.measure, step = if (ex.measure == Measure.REPS) 1 else 5, onChange = { sets[i] = it })
     }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = unclear, onCheckedChange = { unclear = it })
-        Text("The instructions were unclear", style = MaterialTheme.typography.bodyMedium)
-    }
     Text("How did it feel?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        EffortButton("Easy", Good, Modifier.weight(1f)) { onLog(sets.toList(), Effort.EASY, unclear) }
-        EffortButton("OK", Brand, Modifier.weight(1f)) { onLog(sets.toList(), Effort.OK, unclear) }
-        EffortButton("Hard", Color(0xFFFFB066), Modifier.weight(1f)) { onLog(sets.toList(), Effort.HARD, unclear) }
+        EffortButton("Easy", Good, Modifier.weight(1f)) { onLog(sets.toList(), Effort.EASY) }
+        EffortButton("OK", Brand, Modifier.weight(1f)) { onLog(sets.toList(), Effort.OK) }
+        EffortButton("Hard", Color(0xFFFFB066), Modifier.weight(1f)) { onLog(sets.toList(), Effort.HARD) }
     }
-    OutlinedButton(onClick = { onLog(emptyList(), Effort.SKIPPED, unclear) }, modifier = Modifier.fillMaxWidth()) {
+    OutlinedButton(onClick = { onLog(emptyList(), Effort.SKIPPED) }, modifier = Modifier.fillMaxWidth()) {
         Text("Skip / couldn't do it")
     }
     Text(
