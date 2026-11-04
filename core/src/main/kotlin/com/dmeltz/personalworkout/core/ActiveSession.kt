@@ -19,6 +19,8 @@ data class ActiveSession(
     val skipped: Int = 0,
     /** Exercises whose variation went up during this session. */
     val levelledUp: List<String> = emptyList(),
+    /** When the session started, in epoch milliseconds (0 for a session saved before this was kept). */
+    val startedAt: Long = 0,
 ) {
     val plannedCount: Int get() = exerciseIds.size
     val doneCount: Int get() = position
@@ -32,7 +34,7 @@ fun AppState.sessionToContinue(today: Day): ActiveSession? =
 
 object Sessions {
     /** Starts a session: its new exercises count as started from now. */
-    fun start(library: Library, state: AppState, plan: SessionPlan, today: Day): AppState {
+    fun start(library: Library, state: AppState, plan: SessionPlan, today: Day, now: Long = System.currentTimeMillis()): AppState {
         val started = plan.startIds.mapNotNull { library.exercise(it) }
             .associate { it.id to Progression.initial(it, today) }
         return state.copy(
@@ -42,6 +44,7 @@ object Sessions {
                 number = state.sessionsCompleted + 1,
                 kind = plan.kind,
                 exerciseIds = plan.exerciseIds,
+                startedAt = now,
             ),
         )
     }
@@ -67,6 +70,36 @@ object Sessions {
                 levelledUp = session.levelledUp + if (after.variation > before.variation) listOf(ex.id) else emptyList(),
             ),
         )
+    }
+
+    /**
+     * Corrects an exercise logged today: its progress is worked out again from [before], the state it
+     * had before the log, with the corrected sets and effort. [groupDayBefore] is the day its muscle
+     * group was last trained before the log, restored if the correction makes it a skip, unless
+     * [groupTrainedByOthers] (another exercise of the same group was done today). Today's
+     * level point is updated when the session is already finished.
+     */
+    fun correct(
+        library: Library,
+        state: AppState,
+        ex: Exercise,
+        before: ExerciseState,
+        groupDayBefore: Day?,
+        groupTrainedByOthers: Boolean,
+        done: List<Int>,
+        effort: Effort,
+        today: Day,
+    ): AppState {
+        val after = Progression.apply(ex, before, done, effort, today)
+        val trained = when {
+            effort != Effort.SKIPPED || groupTrainedByOthers -> state.groupLastTrained + (ex.group.name to today)
+            groupDayBefore == null -> state.groupLastTrained - ex.group.name
+            else -> state.groupLastTrained + (ex.group.name to groupDayBefore)
+        }
+        val corrected = state.copy(exercises = state.exercises + (ex.id to after), groupLastTrained = trained)
+        if (state.levelHistory.none { it.day == today }) return corrected
+        val point = Progression.levelPoint(library, corrected, today) ?: return corrected
+        return corrected.copy(levelHistory = (corrected.levelHistory.filter { it.day != today } + point).sortedBy { it.day })
     }
 
     /** Finishes the session: counts the day for the streak and records the levels. */

@@ -55,6 +55,24 @@ class Repository private constructor(private val context: Context) {
         logFile.appendText(json.encodeToString(record) + "\n")
     }
 
+    /** Replaces a logged exercise (matched by its time and exercise) with a corrected copy. */
+    @Synchronized
+    fun replaceRecord(record: WorkoutRecord) {
+        if (!logFile.exists()) return appendRecord(record)
+        var replaced = false
+        val lines = logFile.readLines().filter { it.isNotBlank() }.map { line ->
+            val old = runCatching { json.decodeFromString<WorkoutRecord>(line) }.getOrNull()
+            if (old != null && old.timestamp == record.timestamp && old.exerciseId == record.exerciseId) {
+                replaced = true
+                json.encodeToString(record)
+            } else line
+        }
+        if (!replaced) return appendRecord(record)
+        val tmp = File(context.filesDir, "workouts.jsonl.tmp")
+        tmp.writeText(lines.joinToString("\n", postfix = "\n"))
+        tmp.renameTo(logFile)
+    }
+
     fun records(): List<WorkoutRecord> {
         if (!logFile.exists()) return emptyList()
         return logFile.readLines().filter { it.isNotBlank() }.mapNotNull {

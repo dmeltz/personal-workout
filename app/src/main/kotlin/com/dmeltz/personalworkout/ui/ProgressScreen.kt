@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import com.dmeltz.personalworkout.core.Figures
+import com.dmeltz.personalworkout.core.views
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -240,6 +243,10 @@ private fun ExerciseRow(ex: Exercise, state: AppState, onClick: () -> Unit) {
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // The variation you are on (or will start with), as a small still figure.
+        Figures.views(ex.figureAt(s?.variation ?: ex.start)).firstOrNull()?.let { f ->
+            StickFigure(f, Modifier.size(52.dp).padding(end = 6.dp), still = true)
+        }
         Column(Modifier.weight(1f)) {
             Text(ex.title, style = MaterialTheme.typography.bodyLarge)
             Text(

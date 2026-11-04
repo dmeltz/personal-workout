@@ -110,6 +110,7 @@ class MainActivity : ComponentActivity() {
                         history = remember(screen) { repo.records() },
                         onState = ::update,
                         onRecord = repo::appendRecord,
+                        onRecordChanged = repo::replaceRecord,
                         onFinished = {
                             StreakWidget.updateAll(this@MainActivity)
                             stack = listOf(Screen.Home)

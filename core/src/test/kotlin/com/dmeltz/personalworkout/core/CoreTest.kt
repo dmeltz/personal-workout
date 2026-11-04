@@ -176,6 +176,31 @@ class CoreTest {
         assertEquals(1, state.levelHistory.size)
         assertEquals(1, state.streak(monday))
     }
+
+    @Test fun loggedExerciseCanBeCorrected() {
+        val plan = SessionBuilder.build(library, AppState(), monday)
+        var state = Sessions.start(library, AppState(), plan, monday, now = 1234L)
+        assertEquals(1234L, state.activeSession!!.startedAt)
+        val first = ex(plan.exerciseIds.first())
+        val before = state.exerciseState(first.id)!!
+        val groupBefore = state.groupLastTrained[first.group.name]
+        // Logged as skipped by mistake, then the rest of the session.
+        state = Sessions.log(state, first, emptyList(), Effort.SKIPPED, monday)
+        for (id in plan.exerciseIds.drop(1)) state = Sessions.log(state, ex(id), listOf(5, 5), Effort.OK, monday)
+        state = Sessions.settle(library, state)
+        val levelBefore = state.levelHistory.single().overall
+        val others = plan.exerciseIds.drop(1).any { ex(it).group == first.group }
+        // Corrected to an easy full session: the same result as logging it right the first time.
+        val sets = List(before.sets) { before.target }
+        state = Sessions.correct(library, state, first, before, groupBefore, others, sets, Effort.EASY, monday)
+        assertEquals(Progression.apply(first, before, sets, Effort.EASY, monday), state.exerciseState(first.id))
+        assertEquals(monday, state.groupLastTrained[first.group.name])
+        assertEquals(1, state.levelHistory.size)
+        assertTrue(state.levelHistory.single().overall >= levelBefore)
+        // And back to skipped: the group no longer counts as trained.
+        state = Sessions.correct(library, state, first, before, groupBefore, others, emptyList(), Effort.SKIPPED, monday)
+        assertEquals(if (others) monday else groupBefore, state.groupLastTrained[first.group.name])
+    }
 }
 
 class BodyTest {

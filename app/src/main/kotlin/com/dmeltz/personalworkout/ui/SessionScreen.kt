@@ -1,8 +1,5 @@
 package com.dmeltz.personalworkout.ui
 
-import android.speech.tts.TextToSpeech
-import java.util.Locale
-
 import android.media.AudioManager
 import android.media.ToneGenerator
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -56,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.dmeltz.personalworkout.core.ActiveSession
 import com.dmeltz.personalworkout.core.AppState
 import com.dmeltz.personalworkout.core.Effort
+import com.dmeltz.personalworkout.core.Day
 import com.dmeltz.personalworkout.core.Exercise
 import com.dmeltz.personalworkout.core.ExerciseState
 import com.dmeltz.personalworkout.core.Library
@@ -77,6 +75,8 @@ fun SessionScreen(
     history: List<WorkoutRecord>,
     onState: (AppState) -> Unit,
     onRecord: (WorkoutRecord) -> Unit,
+    /** A logged exercise corrected on the summary. */
+    onRecordChanged: (WorkoutRecord) -> Unit,
     onFinished: () -> Unit,
     onQuit: () -> Unit,
 ) {
@@ -90,6 +90,14 @@ fun SessionScreen(
     // Kept for the summary after the session is finished and cleared from the state.
     var finished by remember { mutableStateOf<ActiveSession?>(null) }
     var lastMessage by remember { mutableStateOf<String?>(null) }
+    // Everything logged on this screen, with what is needed to correct it on the summary.
+    val logged = remember { mutableStateListOf<Logged>() }
+    val speaker = rememberSpeaker()
+
+    // The overall clock: from the session's start (or this screen's, for a session saved before
+    // start times were kept) until it is finished.
+    val openedAt = remember { System.currentTimeMillis() }
+    var endedAt by remember { mutableStateOf<Long?>(null) }
 
     // The screen stays on while training.
     val view = LocalView.current
@@ -106,6 +114,8 @@ fun SessionScreen(
     LaunchedEffect(done) {
         if (done && finished == null && session != null) {
             finished = session
+            endedAt = System.currentTimeMillis()
+            speaker.stop()
             update(Sessions.finish(library, state, day))
         }
     }
@@ -114,8 +124,7 @@ fun SessionScreen(
         val current = state.activeSession ?: return
         val next = Sessions.log(state, ex, sets, effort, day)
         val after = next.exerciseState(ex.id) ?: return
-        onRecord(
-            WorkoutRecord(
+        val record = WorkoutRecord(
                 timestamp = System.currentTimeMillis(),
                 day = day,
                 session = current.number,
@@ -136,15 +145,36 @@ fun SessionScreen(
                 nextTarget = after.target,
                 nextSets = after.sets,
                 capoeiraDay = state.isCapoeira(day),
-            ),
-        )
+            )
+        onRecord(record)
+        logged += Logged(ex, before, state.groupLastTrained[ex.group.name], record)
         lastMessage = if (after.variation > before.variation) {
             "Level up! Next time: ${ex.variation(after.variation).name}."
         } else Mascot.logged(effort, System.currentTimeMillis())
         update(next)
     }
 
+    /** Re-does the progress for a logged exercise with corrected sets and feeling. */
+    fun correct(index: Int, sets: List<Int>, effort: Effort) {
+        val l = logged[index]
+        val others = logged.any { it !== l && it.ex.group == l.ex.group && it.record.effort != Effort.SKIPPED }
+        val next = Sessions.correct(library, state, l.ex, l.before, l.groupDayBefore, others, sets, effort, day)
+        val after = next.exerciseState(l.ex.id) ?: return
+        val record = l.record.copy(
+            done = if (effort == Effort.SKIPPED) emptyList() else sets,
+            effort = effort,
+            levelAfter = Progression.level(l.ex, after),
+            nextVariation = l.ex.variation(after.variation).name,
+            nextTarget = after.target,
+            nextSets = after.sets,
+        )
+        logged[index] = l.copy(record = record)
+        onRecordChanged(record)
+        update(next)
+    }
+
     val shown = session ?: finished
+    val startedAt = shown?.startedAt?.takeIf { it > 0 } ?: openedAt
     val planned = shown?.plannedCount ?: 0
     val position = shown?.doneCount ?: 0
 
@@ -163,25 +193,36 @@ fun SessionScreen(
             Text(
                 "$position / $planned",
                 style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(start = 10.dp, end = 16.dp),
+                modifier = Modifier.padding(start = 10.dp),
             )
+            SessionClock(startedAt, endedAt, Modifier.padding(start = 12.dp))
+            // Read-aloud on or off.
+            TextButton(onClick = {
+                if (state.readAloud) speaker.stop()
+                update(state.copy(readAloud = !state.readAloud))
+            }) { Text(if (state.readAloud) "🔊" else "🔇", fontSize = 18.sp) }
         }
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             when {
-                done -> DoneView(finished ?: session, state, library, onFinished)
+                done -> DoneView(finished ?: session, state, library, ((endedAt ?: startedAt) - startedAt) / 1000, logged, ::correct, onFinished)
                 !session!!.warmupDone -> {
                     TodaysMuscles(session.exerciseIds.mapNotNull { library.exercise(it) })
-                    WarmupView(library.warmup) { update(Sessions.warmupDone(state)) }
+                    WarmupView(library.warmup, speak = { if (state.readAloud) speaker.say(it) }) { update(Sessions.warmupDone(state)) }
                 }
                 else -> {
                     val ex = exercise!!
                     val es = state.exerciseState(ex.id) ?: Progression.initial(ex, day)
                     lastMessage?.let { PipSays(Mood.HAPPY, it, size = 48.dp) }
                     key(ex.id, position) {
-                        ExerciseView(ex, es, position, planned, history.filter { it.exerciseId == ex.id && it.day != day }) { sets, effort ->
+                        ExerciseView(
+                            ex, es, position, planned, history.filter { it.exerciseId == ex.id && it.day != day },
+                            readAloud = state.readAloud,
+                            speak = speaker::say,
+                        ) { sets, effort ->
+                            speaker.stop()
                             log(ex, es, sets, effort)
                         }
                     }
@@ -224,23 +265,15 @@ fun ExerciseMuscles(ex: Exercise) {
 }
 
 @Composable
-private fun WarmupView(moves: List<WarmupMove>, onDoneClick: () -> Unit) {
+private fun WarmupView(moves: List<WarmupMove>, speak: (String) -> Unit, onDoneClick: () -> Unit) {
     val onDone by rememberUpdatedState(onDoneClick)
     var index by remember { mutableIntStateOf(-1) }
     var left by remember { mutableIntStateOf(0) }
     // Each move's name is read aloud as it starts, so the phone can stay on the grass.
-    val context = LocalContext.current
-    val tts = remember { arrayOfNulls<TextToSpeech>(1) }
-    DisposableEffect(Unit) {
-        tts[0] = TextToSpeech(context.applicationContext) { status ->
-            if (status == TextToSpeech.SUCCESS) tts[0]?.language = Locale.US
-        }
-        onDispose { tts[0]?.shutdown() }
-    }
     LaunchedEffect(index) {
         if (index !in moves.indices) return@LaunchedEffect
         left = moves[index].seconds
-        tts[0]?.speak(moves[index].name, TextToSpeech.QUEUE_FLUSH, null, "move$index")
+        speak(moves[index].name)
         while (left > 0) {
             delay(1000)
             left--
@@ -289,9 +322,15 @@ private fun ExerciseView(
     position: Int,
     planned: Int,
     previous: List<WorkoutRecord>,
+    readAloud: Boolean,
+    speak: (String) -> Unit,
     onLog: (List<Int>, Effort) -> Unit,
 ) {
     val v = ex.variation(es.variation)
+    // The instructions are read aloud as the exercise comes up, with the form cues the first time
+    // at this variation.
+    val spoken = remember(ex.id, es.variation) { instructions(ex, es, previous.none { it.variationIndex == es.variation }) }
+    LaunchedEffect(ex.id, es.variation) { if (readAloud) speak(spoken) }
     val sets = remember(ex.id) { mutableStateListOf<Int>().apply { repeat(es.sets) { add(es.target) } } }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -317,6 +356,9 @@ private fun ExerciseView(
     if (v.name != ex.title) Text(ex.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.outline)
     ex.figureAt(es.variation).let { name -> key(name) { FigureViews(name, 190.dp) } }
     Text(v.how, style = MaterialTheme.typography.bodyLarge)
+    TextButton(onClick = { speak(spoken) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+        Text("🔊 Read the instructions aloud")
+    }
     ExerciseMuscles(ex)
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -559,8 +601,54 @@ private fun EffortButton(label: String, color: Color, modifier: Modifier, onClic
     ) { Text(label, fontSize = 17.sp, fontWeight = FontWeight.Bold) }
 }
 
+/** A logged exercise, with its state and its group's last training day from before the log. */
+private data class Logged(val ex: Exercise, val before: ExerciseState, val groupDayBefore: Day?, val record: WorkoutRecord)
+
+/** The time since [startedAt], ticking each second until [endedAt]. It owns its ticker so the rest of the screen doesn't redraw every second. */
 @Composable
-private fun DoneView(session: ActiveSession?, state: AppState, library: Library, onFinish: () -> Unit) {
+private fun SessionClock(startedAt: Long, endedAt: Long?, modifier: Modifier) {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(endedAt) {
+        while (endedAt == null) {
+            now = System.currentTimeMillis()
+            delay(1000)
+        }
+    }
+    Text(
+        clock(((endedAt ?: now) - startedAt).coerceAtLeast(0) / 1000),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = if (endedAt == null) MaterialTheme.colorScheme.onSurface else Good,
+        modifier = modifier,
+    )
+}
+
+/** Elapsed seconds as m:ss, or h:mm:ss past an hour. */
+private fun clock(seconds: Long): String {
+    val h = seconds / 3600; val m = seconds / 60 % 60; val sec = seconds % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
+}
+
+/** What is read aloud when an exercise comes up. */
+private fun instructions(ex: Exercise, es: ExerciseState, withCues: Boolean): String = buildString {
+    val v = ex.variation(es.variation)
+    append(v.name).append(". ")
+    append(v.how).append(' ')
+    append("${es.sets} sets of ${ex.amount(es.variation, es.target)}. ")
+    ex.sidesHow(es.variation, es.target)?.let { append(it).append(' ') }
+    if (withCues) (ex.cues + v.cues).forEach { append(it).append(' ') }
+}
+
+@Composable
+private fun DoneView(
+    session: ActiveSession?,
+    state: AppState,
+    library: Library,
+    elapsed: Long,
+    logged: List<Logged>,
+    onCorrect: (Int, List<Int>, Effort) -> Unit,
+    onFinish: () -> Unit,
+) {
     val day = today()
     Spacer(Modifier.height(24.dp))
     Text("Workout done", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -569,12 +657,97 @@ private fun DoneView(session: ActiveSession?, state: AppState, library: Library,
         session?.let { Mascot.sessionDone(it, library) } ?: "Nice work.",
         size = 96.dp,
     )
+    Text("Time: ${clock(elapsed)}", style = MaterialTheme.typography.titleMedium)
     Text("Streak: ${state.streak(day)} days", style = MaterialTheme.typography.titleMedium)
     Progression.overallLevel(library, state)?.let {
         Text("Overall level: %.2f".format(it), style = MaterialTheme.typography.titleMedium)
     }
+    if (logged.isNotEmpty()) {
+        Text("Your log", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(
+            "Logged something wrong? Tap Edit to fix the numbers or how it felt. The next targets update to match.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline,
+        )
+        logged.forEachIndexed { i, l -> key(l.ex.id) { LoggedRow(l) { sets, effort -> onCorrect(i, sets, effort) } } }
+    }
     Spacer(Modifier.height(12.dp))
     Button(onClick = onFinish, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Finish") }
+}
+
+/** One logged exercise on the summary, with an editor for its sets and how it felt. */
+@Composable
+private fun LoggedRow(l: Logged, onSave: (List<Int>, Effort) -> Unit) {
+    val ex = l.ex
+    val r = l.record
+    var editing by remember { mutableStateOf(false) }
+    val sets = remember(editing) {
+        mutableStateListOf<Int>().apply { addAll(r.done.ifEmpty { List(r.setsPlanned) { r.target } }) }
+    }
+    var effort by remember(editing) { mutableStateOf(r.effort) }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(r.variation, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (r.effort == Effort.SKIPPED) "Skipped"
+                        else r.done.joinToString(" / ") + " " + ex.unit + if (r.perSide) " per side" else "",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                Text(effortLabel(r.effort), color = effortColor(r.effort), style = MaterialTheme.typography.bodyMedium)
+                if (!editing) TextButton(onClick = { editing = true }) { Text("Edit") }
+            }
+            Text(
+                "Next time: ${r.nextVariation}, ${r.nextSets} × ${r.nextTarget} ${ex.unit}" + if (r.perSide) " per side" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = Brand,
+            )
+            if (editing) {
+                if (effort != Effort.SKIPPED) {
+                    val step = if (ex.measure == Measure.REPS) 1 else 5
+                    sets.forEachIndexed { i, value ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Set ${i + 1}", modifier = Modifier.width(56.dp))
+                            FilledTonalButton(onClick = { sets[i] = (value - step).coerceAtLeast(0) }) { Text("−") }
+                            Text(
+                                if (ex.measure == Measure.REPS) "$value" else "$value s",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.width(72.dp),
+                            )
+                            FilledTonalButton(onClick = { sets[i] = value + step }) { Text("+") }
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (e in Effort.entries) {
+                        val selected = e == effort
+                        if (selected) {
+                            Button(
+                                onClick = {},
+                                modifier = Modifier.weight(1f),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = effortColor(e), contentColor = Color(0xFF0B1B3A)),
+                            ) { Text(effortLabel(e), fontSize = 13.sp) }
+                        } else {
+                            OutlinedButton(
+                                onClick = { effort = e },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                            ) { Text(effortLabel(e), fontSize = 13.sp) }
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { editing = false }, modifier = Modifier.weight(1f)) { Text("Cancel") }
+                    Button(onClick = { onSave(sets.toList(), effort); editing = false }, modifier = Modifier.weight(1f)) { Text("Save") }
+                }
+            }
+        }
+    }
 }
 
 /** A short beep for "about to end", a longer one at the end. */
