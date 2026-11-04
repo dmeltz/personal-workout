@@ -36,7 +36,7 @@ object Sessions {
     /** Starts a session: its new exercises count as started from now. */
     fun start(library: Library, state: AppState, plan: SessionPlan, today: Day, now: Long = System.currentTimeMillis()): AppState {
         val started = plan.startIds.mapNotNull { library.exercise(it) }
-            .associate { it.id to Progression.initial(it, today) }
+            .associate { it.id to state.initialState(it, today) }
         return state.copy(
             exercises = state.exercises + started,
             activeSession = ActiveSession(
@@ -55,7 +55,7 @@ object Sessions {
     /** Logs the next exercise: progression, muscle group recovery, and the session position. */
     fun log(state: AppState, ex: Exercise, done: List<Int>, effort: Effort, today: Day): AppState {
         val session = state.activeSession ?: return state
-        val before = state.exerciseState(ex.id) ?: Progression.initial(ex, today)
+        val before = state.exerciseState(ex.id) ?: state.initialState(ex, today)
         val after = Progression.apply(ex, before, done, effort, today)
         val trained = if (effort == Effort.SKIPPED) state.groupLastTrained
         else state.groupLastTrained + (ex.group.name to today)

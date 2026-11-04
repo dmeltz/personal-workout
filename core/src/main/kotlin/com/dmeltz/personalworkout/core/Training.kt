@@ -23,6 +23,10 @@ data class ExerciseState(
     val struggles: Int = 0,
 )
 
+/** A level set by hand: where an exercise not started yet will start. */
+@Serializable
+data class StartLevel(val variation: Int, val target: Int, val sets: Int)
+
 @Serializable
 data class LevelPoint(val day: Day, val overall: Double, val groups: Map<String, Double> = emptyMap())
 
@@ -53,12 +57,21 @@ data class AppState(
     /** "Not now" on the weigh-in card hides it until the next day. */
     val weighInSnoozedOn: Day = -1,
     val activeSession: ActiveSession? = null,
+    /** Starting points set by hand for exercises not started yet, by exercise id. */
+    val startLevels: Map<String, StartLevel> = emptyMap(),
     /** Read each exercise's instructions aloud during a session. */
     val readAloud: Boolean = true,
     /** Data format version; see [Migrations]. A state saved before versions existed reads as 0. */
     val version: Int = 0,
 ) {
     fun exerciseState(id: String): ExerciseState? = exercises[id]
+
+    /** Where [ex] starts: the level set by hand for it, if any, otherwise the library's start. */
+    fun initialState(ex: Exercise, today: Day): ExerciseState {
+        val base = Progression.initial(ex, today)
+        val set = startLevels[ex.id] ?: return base
+        return base.copy(variation = set.variation, target = set.target, sets = set.sets)
+    }
 
     /** A weigh-in is due when the last one was a week or more ago, unless put off today. */
     fun weighInDue(today: Day): Boolean =
@@ -155,6 +168,44 @@ object Body {
         val latest = state.weights.lastOrNull() ?: return null
         val earlier = state.weights.lastOrNull { it.day <= today - days } ?: return null
         return latest.kg - earlier.kg
+    }
+}
+
+/** Levels set by hand ("I can already do this"). */
+object Levels {
+    /** [level] clamped to what the exercise allows: a real variation, a target in its range, 1 to [Progression.MAX_SETS] sets. */
+    fun clamp(ex: Exercise, level: StartLevel): StartLevel {
+        val variation = level.variation.coerceIn(ex.variations.indices)
+        val v = ex.variation(variation)
+        return StartLevel(variation, level.target.coerceIn(v.min, v.max), level.sets.coerceIn(1, Progression.MAX_SETS))
+    }
+
+    /** Where [ex] stands now, or where it will start. */
+    fun current(state: AppState, ex: Exercise, today: Day): StartLevel {
+        val s = state.exerciseState(ex.id) ?: state.initialState(ex, today)
+        return StartLevel(s.variation, s.target, s.sets)
+    }
+
+    /**
+     * Sets the levels in [levels], by exercise id. A started exercise moves there now; one not started
+     * yet will start there. Today's level point is recorded again so the charts start from here.
+     */
+    fun set(library: Library, state: AppState, levels: Map<String, StartLevel>, today: Day): AppState {
+        var exercises = state.exercises
+        var starts = state.startLevels
+        for ((id, wanted) in levels) {
+            val ex = library.exercise(id) ?: continue
+            val level = clamp(ex, wanted)
+            val s = exercises[id]
+            if (s != null) {
+                exercises = exercises + (id to s.copy(variation = level.variation, target = level.target, sets = level.sets, struggles = 0))
+            } else {
+                starts = starts + (id to level)
+            }
+        }
+        val updated = state.copy(exercises = exercises, startLevels = starts)
+        val point = Progression.levelPoint(library, updated, today) ?: return updated
+        return updated.copy(levelHistory = (updated.levelHistory.filter { it.day != today } + point).sortedBy { it.day })
     }
 }
 

@@ -78,7 +78,7 @@ object SessionBuilder {
             .filter { state.exercises.isEmpty() || (it.group in allowed && (it.group !in MAIN || rested(it.group))) }
             .toMutableList()
         fun isStarted(ex: Exercise) = state.exerciseState(ex.id) != null || ex in starting
-        fun stateOf(ex: Exercise) = state.exerciseState(ex.id) ?: Progression.initial(ex, today)
+        fun stateOf(ex: Exercise) = state.exerciseState(ex.id) ?: state.initialState(ex, today)
         val todaysNew = if (state.exercises.isEmpty()) emptyList() else starting.toList()
 
         // Main groups: the ones rested longest, skipping any trained yesterday when possible.
