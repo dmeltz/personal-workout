@@ -1,24 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- An "Aa" mark with a check underneath. -->
+<!-- A dumbbell, tilted, with a rising arrow: steady progress. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Capital A -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M30,70 L42,34 L50,34 L62,70 L54,70 L51.5,62 L40.5,62 L38,70 Z M42.5,55.5 L49.5,55.5 L46,44 Z" />
-    <!-- Small a -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M72,46 C78,46 81,49 81,55 L81,70 L74.5,70 L74.5,67.5 C73,69.5 70.5,70.6 67.5,70.6 C62.5,70.6 59.5,67.8 59.5,63.6 C59.5,59 63,56.6 69.5,56.6 L74.3,56.6 L74.3,55.5 C74.3,53 72.8,51.7 70,51.7 C67.8,51.7 65.9,52.4 64.3,53.6 L61.8,49.2 C64.3,47.1 67.9,46 72,46 Z M69.8,61 C67.4,61 66.3,61.9 66.3,63.4 C66.3,64.9 67.5,65.9 69.5,65.9 C71.8,65.9 73.8,64.7 74.3,62.6 L74.3,61 Z" />
-    <!-- Check -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="-30"
+        android:translateY="-7">
+        <!-- Handle -->
+        <path android:fillColor="#FFFFFF" android:pathData="M38,51 L70,51 L70,57 L38,57 Z" />
+        <!-- Left plates -->
+        <path android:fillColor="#FFFFFF" android:pathData="M31,40 Q31,37 34,37 L37,37 Q40,37 40,40 L40,68 Q40,71 37,71 L34,71 Q31,71 31,68 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M24,45 Q24,43 26,43 L28,43 Q30,43 30,45 L30,63 Q30,65 28,65 L26,65 Q24,65 24,63 Z" />
+        <!-- Right plates -->
+        <path android:fillColor="#FFFFFF" android:pathData="M68,40 Q68,37 71,37 L74,37 Q77,37 77,40 L77,68 Q77,71 74,71 L71,71 Q68,71 68,68 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M78,45 Q78,43 80,43 L82,43 Q84,43 84,45 L84,63 Q84,65 82,65 L80,65 Q78,65 78,63 Z" />
+    </group>
+    <!-- Rising arrow under the dumbbell -->
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#9BE3A0"
-        android:strokeWidth="5"
+        android:strokeColor="#FFD166"
+        android:strokeWidth="4.5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M42,80 L50,86 L66,76" />
+        android:pathData="M36,84 L48,77 L56,82 L71,72 M63,71 L71,72 L70,80" />
 </vector>
