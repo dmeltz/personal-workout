@@ -417,7 +417,9 @@ private fun ExerciseView(
     // The instructions are read aloud as the exercise comes up, with the form cues the first time
     // at this variation.
     val spoken = remember(ex.id, es.variation) { instructions(ex, es, previous.none { it.variationIndex == es.variation }) }
-    LaunchedEffect(ex.id, es.variation) { if (readAloud) speak(spoken) }
+    LaunchedEffect(ex.id, es.variation) {
+        if (readAloud) speak((if (position > 0) "Moving to the next exercise. " else "") + spoken)
+    }
     val sets = remember(ex.id) { mutableStateListOf<Int>().apply { repeat(es.sets) { add(es.target) } } }
     // The exercise runs by itself: time to read the instructions, then each set and rest in turn,
     // then how it felt. Even steps are sets, odd ones the rests between them.
