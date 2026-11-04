@@ -143,6 +143,16 @@ fun ProgressScreen(
                     }
                 }
             }
+            item {
+                Text(
+                    "Each bar is an exercise's ladder of variations, easiest on the left. The filled part of the " +
+                        "current block is how far your target is through that variation's range. Tap an exercise " +
+                        "for its full history.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+            }
             for (group in Group.entries) {
                 val exercises = library.inGroup(group)
                 item {
@@ -234,9 +244,12 @@ private fun ExerciseRow(ex: Exercise, state: AppState, onClick: () -> Unit) {
             Text(ex.title, style = MaterialTheme.typography.bodyLarge)
             Text(
                 if (s == null) "Not started yet"
-                else "${ex.variation(s.variation).name} · ${s.sets} × ${s.target} ${ex.unit}${if (ex.perSide) " per side" else ""}",
+                else "${s.variation + 1}/${ex.variations.size} ${ex.variation(s.variation).name} · " +
+                    "${s.sets} × ${s.target} ${ex.unit}${if (ex.perSide) " per side" else ""} " +
+                    "(range ${ex.variation(s.variation).min}–${ex.variation(s.variation).max})",
                 style = MaterialTheme.typography.bodySmall,
             )
+            LadderBar(ex, s, modifier = Modifier.padding(top = 6.dp))
         }
         if (s != null) {
             Text(
