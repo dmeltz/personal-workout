@@ -1,4 +1,4 @@
-"""Generates the widget's Pip drawables (app/src/main/res/drawable/pip_*.xml).
+"""Generates Pip the coach (app/src/main/res/drawable/pip_*.xml): sweatband, whistle on a cord.
 
 The in-app Pip is drawn in ui/Pip.kt with the same geometry; keep the two in step.
 Run from the repository root: python3 tools/gen_mascot.py
@@ -8,11 +8,11 @@ from pathlib import Path
 DARK = "#1B1E24"
 BODY = {"happy": "#5CC98A", "calm": "#6E9CF5", "waiting": "#E8C14A", "annoyed": "#F08A3C", "angry": "#E5484D"}
 BROWS = {
-    "happy": ("M31,39 Q38,33 45,39", "M55,39 Q62,33 69,39"),
-    "calm": ("M31,39 Q38,36 45,39", "M55,39 Q62,36 69,39"),
-    "waiting": ("M31,40 L45,35", "M55,35 L69,40"),
-    "annoyed": ("M31,36 L45,40", "M55,40 L69,36"),
-    "angry": ("M30,34 L46,42", "M54,42 L70,34"),
+    "happy": ("M31,43 Q38,38 45,43", "M55,43 Q62,38 69,43"),
+    "calm": ("M31,43 Q38,40.5 45,43", "M55,43 Q62,40.5 69,43"),
+    "waiting": ("M31,44 L45,40.5", "M55,40.5 L69,44"),
+    "annoyed": ("M31,41 L45,44.5", "M55,44.5 L69,41"),
+    "angry": ("M30,40 L46,46", "M54,46 L70,40"),
 }
 MOUTH = {  # (path, filled)
     "happy": ("M38,67 Q50,82 62,67 Z", True),
@@ -47,25 +47,28 @@ def pip(mood, alt):
         for cx, cy, rr in ((16, 24, 4.5), (11, 16, 3.2), (84, 24, 4.5), (89, 16, 3.2)):
             parts.append(fill(circle(cx, cy, rr * r), "#D9DCE3"))
     parts.append(fill(circle(50, 56, 36), BODY[mood]))
-    # Mortarboard cap with a tassel.
-    parts.append(fill("M40,22 L60,22 L60,29 L40,29 Z", DARK))
-    parts.append(fill("M27,22 L50,13 L73,22 L50,31 Z", DARK))
-    parts.append(stroke("M50,22 L68,26 L68,34", 1.6, "#F2C94C"))
+    # Sweatband across the forehead, with the knot's tails flying out on the right.
+    parts.append(fill("M83,34 L95,26 L97,31 L86,37 Z", "#FFFFFF"))
+    parts.append(fill("M84,38 L96,40 L95,45 L84,42 Z", "#FFFFFF"))
+    parts.append(fill("M17.5,40 Q50,22 82.5,40 L84.5,32 Q50,12 15.5,32 Z", "#FFFFFF"))
+    parts.append(fill("M16.5,36.5 Q50,17.5 83.5,36.5 L83.9,34.6 Q50,15.5 16.1,34.6 Z", "#E5484D"))
+    # Whistle on a cord around the neck.
+    parts.append(stroke("M26,78 Q38,88 54,85", 1.6, "#F2C94C"))
+    parts.append(stroke("M74,78 Q67,84 60,85", 1.6, "#F2C94C"))
+    parts.append(fill("M52,81 L65,81 Q70,81 70,86 Q70,91 65,91 L58,91 Q52,91 52,86 Z", "#C9CED8"))
+    parts.append(fill("M65,81 L73,81 L73,85 L65,85 Z", "#C9CED8"))
+    parts.append(fill(circle(59, 86, 2), "#7E8696"))
     if mood == "happy":
         parts.append(fill(circle(30, 64, 4.5), "#F7A8B8"))
         parts.append(fill(circle(70, 64, 4.5), "#F7A8B8"))
     if blink:
-        parts.append(stroke("M31,52 L45,52"))
-        parts.append(stroke("M55,52 L69,52"))
+        parts.append(stroke("M32,54 L44,54"))
+        parts.append(stroke("M56,54 L68,54"))
     else:
         pr = 3.0 if mood == "angry" else 3.8
         for cx in (38, 62):
-            parts.append(fill(circle(cx, 52, 8), "#FFFFFF"))
-            parts.append(fill(circle(cx + 1, 53, pr), DARK))
-    # Glasses.
-    parts.append(stroke(circle(38, 52, 10.5), 2.0))
-    parts.append(stroke(circle(62, 52, 10.5), 2.0))
-    parts.append(stroke("M48.5,51 L51.5,51", 2.0))
+            parts.append(fill(circle(cx, 54, 7), "#FFFFFF"))
+            parts.append(fill(circle(cx + 1, 55, pr), DARK))
     left, right = BROWS[mood]
     parts.append(stroke(left))
     parts.append(stroke(right))
