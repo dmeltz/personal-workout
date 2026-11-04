@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import com.dmeltz.personalworkout.core.Figure
 import com.dmeltz.personalworkout.core.Pose
 import com.dmeltz.personalworkout.core.Prop
+import com.dmeltz.personalworkout.core.views
 
 /** The exercise's stick figure, moving slowly between its start and end positions. */
 @Composable
