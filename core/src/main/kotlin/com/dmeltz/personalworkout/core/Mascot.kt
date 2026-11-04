@@ -107,6 +107,7 @@ object Mascot {
             .mapNotNull { g -> Progression.groupLevel(library, state, g)?.let { g to it } }
             .minByOrNull { it.second }
         val focus = if (weakest != null) " Your weakest area is ${weakest.first.short.lowercase()}." else ""
-        return "Overall level %.1f.".format(level) + trend + focus
+        val weight = Body.change(state, today, 28)?.let { " Weight %+.1f kg over 4 weeks.".format(it) } ?: ""
+        return "Overall level %.1f.".format(level) + trend + focus + weight
     }
 }

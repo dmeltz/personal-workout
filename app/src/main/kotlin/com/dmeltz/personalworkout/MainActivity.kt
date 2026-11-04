@@ -118,6 +118,7 @@ class MainActivity : ComponentActivity() {
                     Screen.Progress -> ProgressScreen(
                         state = state,
                         library = repo.library,
+                        onState = ::update,
                         onExercise = { push(Screen.Exercise(it)) },
                         onBack = ::pop,
                     )

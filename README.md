@@ -14,6 +14,8 @@ export, automatic upload to a private GitHub repository, and in-app Update butto
 - Planned rest days (Saturday by default, set in Settings) don't break the streak. Marking a capoeira
   day on the home screen counts for the streak, makes that day's session short and optional, and keeps
   legs and conditioning out of that day and the next.
+- Weekly weigh-in: a card on the home screen when the last weigh-in is a week old (the evening reminder
+  mentions it the day before), and a weight chart on the progress screen.
 - Progress: a level per exercise (variation number plus how far through its range), per muscle group,
   and overall, with charts.
 - Every log is kept; Settings > Export history shares it as JSON, and after each session it is uploaded

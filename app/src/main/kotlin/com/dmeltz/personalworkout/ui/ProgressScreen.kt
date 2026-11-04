@@ -29,7 +29,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.dmeltz.personalworkout.core.AppState
+import com.dmeltz.personalworkout.core.Body
 import com.dmeltz.personalworkout.core.Day
 import com.dmeltz.personalworkout.core.Exercise
 import com.dmeltz.personalworkout.core.Group
@@ -56,6 +62,7 @@ val groupColors = mapOf(
 fun ProgressScreen(
     state: AppState,
     library: Library,
+    onState: (AppState) -> Unit,
     onExercise: (String) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -97,6 +104,38 @@ fun ProgressScreen(
                         }
                         LevelChart(series, Modifier.fillMaxWidth().height(200.dp).padding(top = 12.dp))
                         Legend(series)
+                    }
+                }
+            }
+            item {
+                Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val last = state.weights.lastOrNull()
+                        Text(
+                            "Weight: ${last?.let { "%.1f kg".format(it.kg) } ?: "–"}",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Body.change(state, day, 28)?.let {
+                            Text("%+.1f kg over the last 4 weeks.".format(it), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Text(
+                            "With muscle building, a slow gain (up to about 0.25 kg a week) is expected and fine.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        LevelChart(
+                            listOf(LineSeries("Weight", Color(0xFFDCC878), state.weights.map { it.day to it.kg })),
+                            Modifier.fillMaxWidth().height(160.dp),
+                        )
+                        var adding by remember { mutableStateOf(false) }
+                        if (adding) {
+                            WeightInput(last?.kg) {
+                                onState(Body.logWeight(state, day, it))
+                                adding = false
+                            }
+                        } else {
+                            TextButton(onClick = { adding = true }) { Text("Add a weigh-in") }
+                        }
                     }
                 }
             }
@@ -163,7 +202,7 @@ fun LevelChart(series: List<LineSeries>, modifier: Modifier) {
     if (all.map { it.first }.distinct().size < 2) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "The graph appears after your second training day.",
+                "The graph appears after your second entry.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
             )

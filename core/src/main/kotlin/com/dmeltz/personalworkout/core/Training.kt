@@ -26,6 +26,10 @@ data class ExerciseState(
 @Serializable
 data class LevelPoint(val day: Day, val overall: Double, val groups: Map<String, Double> = emptyMap())
 
+/** A weigh-in, in kilograms. */
+@Serializable
+data class WeightEntry(val day: Day, val kg: Double)
+
 @Serializable
 data class AppState(
     val exercises: Map<String, ExerciseState> = emptyMap(),
@@ -44,9 +48,17 @@ data class AppState(
     val reminderMinute: Int = 0,
     val reminderEnabled: Boolean = true,
     val safetyAccepted: Boolean = false,
+    /** Weekly weigh-ins, ascending by day. */
+    val weights: List<WeightEntry> = emptyList(),
+    /** "Not now" on the weigh-in card hides it until the next day. */
+    val weighInSnoozedOn: Day = -1,
     val activeSession: ActiveSession? = null,
 ) {
     fun exerciseState(id: String): ExerciseState? = exercises[id]
+
+    /** A weigh-in is due when the last one was a week or more ago, unless put off today. */
+    fun weighInDue(today: Day): Boolean =
+        weighInSnoozedOn != today && (weights.lastOrNull()?.day ?: Long.MIN_VALUE) <= today - WEIGH_IN_DAYS
 
     fun trainedOn(day: Day): Boolean = sessionDays.binarySearch(day) >= 0
 
@@ -106,6 +118,23 @@ data class WorkoutRecord(
     /** The user flagged the instructions as unclear. */
     val unclear: Boolean = false,
 )
+
+const val WEIGH_IN_DAYS = 7
+
+object Body {
+    /** Records a weigh-in, replacing any earlier one on the same day. */
+    fun logWeight(state: AppState, day: Day, kg: Double): AppState =
+        state.copy(weights = (state.weights.filter { it.day != day } + WeightEntry(day, kg)).sortedBy { it.day })
+
+    fun snooze(state: AppState, day: Day): AppState = state.copy(weighInSnoozedOn = day)
+
+    /** Change over the last [days] days: latest minus the last weigh-in at least that long ago. Null without both. */
+    fun change(state: AppState, today: Day, days: Int): Double? {
+        val latest = state.weights.lastOrNull() ?: return null
+        val earlier = state.weights.lastOrNull { it.day <= today - days } ?: return null
+        return latest.kg - earlier.kg
+    }
+}
 
 object Progression {
     const val MAX_SETS = 3

@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dmeltz.personalworkout.core.AppState
+import com.dmeltz.personalworkout.core.Body
 import com.dmeltz.personalworkout.core.DayKind
 import com.dmeltz.personalworkout.core.Library
 import com.dmeltz.personalworkout.core.Mascot
@@ -69,6 +70,14 @@ fun HomeScreen(
             UpdatePanel(compact = true)
             if (!state.safetyAccepted) {
                 SafetyCard(library.safety) { onState(state.copy(safetyAccepted = true)) }
+                Spacer(Modifier.height(16.dp))
+            }
+            if (state.weighInDue(day)) {
+                WeighInCard(
+                    last = state.weights.lastOrNull()?.kg,
+                    onSave = { onState(Body.logWeight(state, day, it)) },
+                    onLater = { onState(Body.snooze(state, day)) },
+                )
                 Spacer(Modifier.height(16.dp))
             }
             val mood = currentMood(state)

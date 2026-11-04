@@ -164,3 +164,19 @@ class CoreTest {
         assertEquals(1, state.streak(monday))
     }
 }
+
+class BodyTest {
+    @Test fun weighInIsWeekly() {
+        var s = AppState()
+        assertTrue(s.weighInDue(100))
+        s = Body.snooze(s, 100)
+        assertFalse(s.weighInDue(100))
+        assertTrue(s.weighInDue(101))
+        s = Body.logWeight(s, 101, 76.0)
+        assertFalse(s.weighInDue(107))
+        assertTrue(s.weighInDue(108))
+        s = Body.logWeight(Body.logWeight(s, 108, 76.6), 108, 76.4)
+        assertEquals(2, s.weights.size)
+        assertEquals(0.4, Body.change(s, 108, 7)!!, 1e-9)
+    }
+}
