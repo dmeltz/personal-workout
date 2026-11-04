@@ -53,6 +53,8 @@ data class AppState(
     /** "Not now" on the weigh-in card hides it until the next day. */
     val weighInSnoozedOn: Day = -1,
     val activeSession: ActiveSession? = null,
+    /** Read each exercise's instructions aloud during a session. */
+    val readAloud: Boolean = true,
     /** Data format version; see [Migrations]. A state saved before versions existed reads as 0. */
     val version: Int = 0,
 ) {

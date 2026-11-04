@@ -37,8 +37,15 @@ import kotlin.math.floor
  * first and fainter, so the near arm and leg stand out; the eyes show which way the face points.
  */
 @Composable
-fun StickFigure(figure: Figure, modifier: Modifier) {
+fun StickFigure(figure: Figure, modifier: Modifier, still: Boolean = false) {
     val n = figure.frames.size
+    // A still figure shows the move's working position: the far end of a back-and-forth move.
+    val t = if (still) (if (figure.loop) 0.25f else 1f) else animatedTime(figure)
+    StickFigureAt(figure, modifier, t, n)
+}
+
+@Composable
+private fun animatedTime(figure: Figure): Float {
     val transition = rememberInfiniteTransition(label = "figure")
     val t by transition.animateFloat(
         initialValue = 0f,
@@ -50,6 +57,11 @@ fun StickFigure(figure: Figure, modifier: Modifier) {
         },
         label = "t",
     )
+    return t
+}
+
+@Composable
+private fun StickFigureAt(figure: Figure, modifier: Modifier, t: Float, n: Int) {
     val body = Brand
     val background = MaterialTheme.colorScheme.background
     val propColor = Color(0xFF8E96A4)
