@@ -203,6 +203,30 @@ class CoreTest {
     }
 }
 
+class LevelsTest {
+    private val library = LibraryParser.parse(File("../app/src/main/assets/exercises.txt").readText())
+    private val day = 20000L
+
+    @Test fun setLevelsMoveStartedAndSetStartsForTheRest() {
+        val push = library.exercise("PUSHUP")!!
+        val pull = library.exercise("PULLUP")!!
+        var state = AppState(exercises = mapOf("PUSHUP" to Progression.initial(push, day).copy(struggles = 2)))
+        state = Levels.set(library, state, mapOf(
+            "PUSHUP" to StartLevel(variation = 2, target = 10, sets = 3),
+            "PULLUP" to StartLevel(variation = 2, target = 99, sets = 2),
+        ), day)
+        val p = state.exerciseState("PUSHUP")!!
+        assertEquals(listOf(2, 10, 3, 0), listOf(p.variation, p.target, p.sets, p.struggles))
+        assertEquals(null, state.exerciseState("PULLUP"), "setting a level doesn't start an exercise")
+        assertEquals(StartLevel(2, pull.variation(2).max, 2), state.startLevels["PULLUP"], "the target is kept inside the range")
+        assertEquals(day, state.levelHistory.single().day)
+        // When the pull-up starts, it starts there.
+        val started = state.initialState(pull, day + 5)
+        assertEquals(listOf(2, pull.variation(2).max, 2), listOf(started.variation, started.target, started.sets))
+        assertEquals(StartLevel(2, pull.variation(2).max, 2), Levels.current(state, pull, day))
+    }
+}
+
 class BodyTest {
     @Test fun weighInIsWeekly() {
         var s = AppState()

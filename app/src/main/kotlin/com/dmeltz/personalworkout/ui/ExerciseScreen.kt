@@ -42,7 +42,7 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
         ) {
             Text(exercise.group.label, style = MaterialTheme.typography.labelLarge)
             // The figure for the variation you are on (or will start with).
-            FigureViews(exercise.figureAt(s?.variation ?: exercise.start), 170.dp)
+            FigureViews(exercise.figureAt(s?.variation ?: state.startLevels[exercise.id]?.variation ?: exercise.start), 170.dp)
             ExerciseMuscles(exercise)
             if (s != null) {
                 Text(

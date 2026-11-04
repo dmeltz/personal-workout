@@ -70,12 +70,17 @@ fun ProgressScreen(
     library: Library,
     onState: (AppState) -> Unit,
     onExercise: (String) -> Unit,
+    onSetLevels: () -> Unit,
     onBack: () -> Unit,
 ) {
     val day = today()
     val overall = Progression.overallLevel(library, state)
     val started = library.exercises.count { state.exerciseState(it.id) != null }
-    Page(title = "My progress", onBack = onBack) { padding ->
+    Page(
+        title = "My progress",
+        onBack = onBack,
+        actions = { TextButton(onClick = onSetLevels) { Text("Set my levels") } },
+    ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
@@ -244,7 +249,7 @@ private fun ExerciseRow(ex: Exercise, state: AppState, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // The variation you are on (or will start with), as a small still figure.
-        Figures.views(ex.figureAt(s?.variation ?: ex.start)).firstOrNull()?.let { f ->
+        Figures.views(ex.figureAt(s?.variation ?: state.startLevels[ex.id]?.variation ?: ex.start)).firstOrNull()?.let { f ->
             StickFigure(f, Modifier.size(52.dp).padding(end = 6.dp), still = true)
         }
         Column(Modifier.weight(1f)) {

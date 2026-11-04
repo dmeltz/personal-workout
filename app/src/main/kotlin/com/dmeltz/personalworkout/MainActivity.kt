@@ -27,6 +27,7 @@ import com.dmeltz.personalworkout.sync.AnswerSync
 import com.dmeltz.personalworkout.ui.AppTheme
 import com.dmeltz.personalworkout.ui.ExerciseScreen
 import com.dmeltz.personalworkout.ui.HomeScreen
+import com.dmeltz.personalworkout.ui.LevelsScreen
 import com.dmeltz.personalworkout.ui.ProgressScreen
 import com.dmeltz.personalworkout.ui.SessionScreen
 import com.dmeltz.personalworkout.ui.SettingsScreen
@@ -38,6 +39,7 @@ sealed interface Screen {
     data object Progress : Screen
     data class Exercise(val id: String) : Screen
     data object Settings : Screen
+    data object Levels : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -122,12 +124,19 @@ class MainActivity : ComponentActivity() {
                         library = repo.library,
                         onState = ::update,
                         onExercise = { push(Screen.Exercise(it)) },
+                        onSetLevels = { push(Screen.Levels) },
                         onBack = ::pop,
                     )
                     is Screen.Exercise -> ExerciseScreen(
                         exercise = repo.library.exercise(screen.id)!!,
                         state = state,
                         records = remember(screen.id) { repo.records().filter { it.exerciseId == screen.id } },
+                        onBack = ::pop,
+                    )
+                    Screen.Levels -> LevelsScreen(
+                        state = state,
+                        library = repo.library,
+                        onSave = ::update,
                         onBack = ::pop,
                     )
                     Screen.Settings -> SettingsScreen(

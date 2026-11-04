@@ -214,7 +214,7 @@ fun SessionScreen(
                 }
                 else -> {
                     val ex = exercise!!
-                    val es = state.exerciseState(ex.id) ?: Progression.initial(ex, day)
+                    val es = state.exerciseState(ex.id) ?: state.initialState(ex, day)
                     lastMessage?.let { PipSays(Mood.HAPPY, it, size = 48.dp) }
                     key(ex.id, position) {
                         ExerciseView(
