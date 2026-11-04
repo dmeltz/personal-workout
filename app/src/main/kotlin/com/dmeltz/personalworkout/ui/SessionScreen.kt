@@ -567,7 +567,6 @@ private fun LastTime(ex: Exercise, es: ExerciseState, previous: List<WorkoutReco
             val why = when {
                 es.variation > last.variationIndex -> "You topped the range last time, so today moves up to ${ex.variation(es.variation).name}."
                 es.variation < last.variationIndex -> "Last time was too much, so today steps back to ${ex.variation(es.variation).name}."
-                es.sets > last.setsPlanned -> "You topped the hardest version, so today adds a set."
                 last.effort == Effort.EASY -> "It felt easy last time, so today's target goes up: $now."
                 last.effort == Effort.OK -> "It felt OK last time, so a small step up: $now."
                 last.effort == Effort.HARD -> "It felt hard last time, so the target holds or eases: $now."

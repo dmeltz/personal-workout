@@ -70,7 +70,7 @@ data class AppState(
     fun initialState(ex: Exercise, today: Day): ExerciseState {
         val base = Progression.initial(ex, today)
         val set = startLevels[ex.id] ?: return base
-        return base.copy(variation = set.variation, target = set.target, sets = set.sets)
+        return base.copy(variation = set.variation, target = set.target)
     }
 
     /** A weigh-in is due when the last one was a week or more ago, unless put off today. */
@@ -140,7 +140,7 @@ const val WEIGH_IN_DAYS = 7
 
 /** Updates a saved state to the current exercise library. */
 object Migrations {
-    const val CURRENT = 1
+    const val CURRENT = 2
 
     fun run(library: Library, state: AppState): AppState {
         var s = state
@@ -151,6 +151,13 @@ object Migrations {
                 val ex = library.exercise(id)
                 if (ex != null && ex.sidesAt(es.variation) == Sides.ALTERNATE) es.copy(target = (es.target + 1) / 2) else es
             })
+        }
+        if (s.version < 2) {
+            // Version 2: always the exercise's usual sets; an extra set earned at the top of a ladder goes.
+            s = s.copy(
+                exercises = s.exercises.mapValues { (id, es) -> library.exercise(id)?.let { es.copy(sets = it.sets) } ?: es },
+                startLevels = s.startLevels.mapValues { (id, l) -> library.exercise(id)?.let { l.copy(sets = it.sets) } ?: l },
+            )
         }
         return s.copy(version = CURRENT)
     }
@@ -173,11 +180,11 @@ object Body {
 
 /** Levels set by hand ("I can already do this"). */
 object Levels {
-    /** [level] clamped to what the exercise allows: a real variation, a target in its range, 1 to [Progression.MAX_SETS] sets. */
+    /** [level] clamped to what the exercise allows: a real variation, a target in its range, and its usual sets. */
     fun clamp(ex: Exercise, level: StartLevel): StartLevel {
         val variation = level.variation.coerceIn(ex.variations.indices)
         val v = ex.variation(variation)
-        return StartLevel(variation, level.target.coerceIn(v.min, v.max), level.sets.coerceIn(1, Progression.MAX_SETS))
+        return StartLevel(variation, level.target.coerceIn(v.min, v.max), ex.sets)
     }
 
     /** Where [ex] stands now, or where it will start. */
@@ -198,7 +205,7 @@ object Levels {
             val level = clamp(ex, wanted)
             val s = exercises[id]
             if (s != null) {
-                exercises = exercises + (id to s.copy(variation = level.variation, target = level.target, sets = level.sets, struggles = 0))
+                exercises = exercises + (id to s.copy(variation = level.variation, target = level.target, sets = ex.sets, struggles = 0))
             } else {
                 starts = starts + (id to level)
             }
@@ -210,9 +217,6 @@ object Levels {
 }
 
 object Progression {
-    const val MAX_SETS = 3
-    /** Level per set above or below an exercise's usual number of sets. */
-    const val SET_WEIGHT = 0.5
 
     fun small(ex: Exercise) = if (ex.measure == Measure.REPS) 1 else 5
     fun big(ex: Exercise) = if (ex.measure == Measure.REPS) 2 else 10
@@ -224,13 +228,15 @@ object Progression {
      * Capacity on one scale across variations: the variation number (1 = easiest) plus how far the
      * target is through that variation's range. 2.5 means halfway up the second variation.
      */
+    /** On the hardest variation with the target at the top of its range: time to decide what's next. */
+    fun atTop(ex: Exercise, s: ExerciseState): Boolean =
+        s.variation == ex.variations.lastIndex && s.target >= ex.variation(s.variation).max
+
     fun level(ex: Exercise, s: ExerciseState): Double {
         val v = ex.variation(s.variation)
         val within = ((s.target - v.min).toDouble() / (v.max - v.min)).coerceIn(0.0, 1.0)
-        // Each set above or below the exercise's usual number counts half a level either way. Half,
-        // because a set is added at mid-range: topping the range (+1 through it) and the new set at
-        // mid-range (+0.5 within, +0.5 for the set) are the same level, so the line doesn't jump.
-        return s.variation + 1 + within + SET_WEIGHT * (s.sets - ex.sets)
+        // The number of sets never changes (always the exercise's usual sets), so it isn't part of the level.
+        return s.variation + 1 + within
     }
 
     /**
@@ -245,7 +251,6 @@ object Progression {
         val struggles = if (effort == Effort.HARD || effort == Effort.SKIPPED) s.struggles + 1 else 0
 
         var variation = s.variation
-        var sets = s.sets
         var target = when (effort) {
             Effort.SKIPPED -> s.target - big(ex)
             Effort.HARD -> if (hit) s.target else achieved
@@ -256,28 +261,22 @@ object Progression {
         if (effort == Effort.HARD && hit && struggles >= 2) target -= small(ex)
 
         if (target > v.max) {
-            when {
-                variation < ex.variations.lastIndex -> { variation++; target = ex.variation(variation).min }
-                sets < MAX_SETS -> { sets++; target = v.min + (v.max - v.min) / 2 }
-                else -> target = minOf(target, v.max * 2)
-            }
+            // Past the top of the range: the next variation, or, on the hardest one, the target stays
+            // at its top. What comes after the top of the ladder is decided then.
+            if (variation < ex.variations.lastIndex) { variation++; target = ex.variation(variation).min }
+            else target = v.max
         } else if (target < v.min) {
-            when {
-                // Back to the usual sets at mid-range: the same level as the extra set at the bottom.
-                sets > ex.sets -> { sets--; target = v.min + (v.max - v.min) / 2 }
-                variation > 0 && (effort == Effort.SKIPPED || achieved < v.min) -> {
-                    variation--
-                    val prev = ex.variation(variation)
-                    target = prev.max - (prev.max - prev.min) / 3
-                }
-                // The easiest variation: the target may go below its range.
-                else -> Unit
+            if (variation > 0 && (effort == Effort.SKIPPED || achieved < v.min)) {
+                variation--
+                val prev = ex.variation(variation)
+                target = prev.max - (prev.max - prev.min) / 3
             }
+            // The easiest variation: the target may go below its range.
         }
         return s.copy(
             variation = variation,
             target = target.coerceAtLeast(1),
-            sets = sets,
+            sets = ex.sets,
             lastDone = today,
             times = s.times + 1,
             struggles = struggles,

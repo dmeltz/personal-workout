@@ -85,16 +85,18 @@ fun LadderDetail(ex: Exercise, s: ExerciseState?) {
                 "Target ${ex.amount(s.variation, s.target)}, in a range of ${v.min}–${v.max} " +
                     "(${(rangeFraction(ex, s) * 100).toInt()}% of the way). " +
                     if (s.variation < ex.variations.lastIndex) "Past ${v.max} you move to variation ${s.variation + 2}."
-                    else if (s.sets < Progression.MAX_SETS) "Past ${v.max} the app adds a set for you, and the target goes back to mid-range."
-                    else "This is the top of the ladder: the target keeps rising past ${v.max}.",
+                    else "This is the hardest variation: the target stops at ${v.max}.",
                 style = MaterialTheme.typography.bodySmall,
             )
-            Text(
-                "Sets: ${s.sets} (usually ${ex.sets}). The app changes them, you don't need to: it adds one when you top " +
-                    "the hardest variation and takes it away if that gets too hard. Each set more or fewer than usual " +
-                    "counts half a level.",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Text("Always ${ex.sets} sets.", style = MaterialTheme.typography.bodySmall)
+            if (Progression.atTop(ex, s)) {
+                Text(
+                    "You've reached the top of this ladder. Tell Claude in the project and you'll decide together what comes next.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = groupColors.getValue(ex.group),
+                )
+            }
         }
     }
 }

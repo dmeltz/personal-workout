@@ -37,7 +37,7 @@ import com.dmeltz.personalworkout.core.views
 import com.dmeltz.personalworkout.today
 
 /**
- * Set where you are on every exercise: the variation, the target per set and the number of sets.
+ * Set where you are on every exercise: the variation and the target per set.
  * A started exercise moves there now; one not started yet will start there when its turn comes.
  */
 @Composable
@@ -62,7 +62,7 @@ fun LevelsScreen(state: AppState, library: Library, onSave: (AppState) -> Unit, 
         ) {
             item {
                 Text(
-                    "Set the variation and the reps or seconds per set you can do now with good form. " +
+                    "Set the variation and the reps or seconds per set you can do now with good form (always ${library.exercises.firstOrNull()?.sets ?: 2} sets). " +
                         "Started exercises move there right away; the others will start there when their turn comes. " +
                         "Progress carries on from these levels.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -124,12 +124,6 @@ private fun LevelCard(ex: Exercise, level: StartLevel, started: Boolean, changed
                 value = "${level.target} ${ex.unit}  (${v.min}–${v.max})",
                 onMinus = if (level.target > v.min) { { onChange(level.copy(target = level.target - step)) } } else null,
                 onPlus = if (level.target < v.max) { { onChange(level.copy(target = level.target + step)) } } else null,
-            )
-            Stepper(
-                label = "Sets",
-                value = "${level.sets}",
-                onMinus = if (level.sets > 1) { { onChange(level.copy(sets = level.sets - 1)) } } else null,
-                onPlus = if (level.sets < Progression.MAX_SETS) { { onChange(level.copy(sets = level.sets + 1)) } } else null,
             )
         }
     }
