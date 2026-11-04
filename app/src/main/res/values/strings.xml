@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Personal Workout</string>
+    <string name="widget_description">Your streak and average grade</string>
+    <string name="reminder_channel">Daily reminder</string>
+    <string name="reminder_title">Pip is waiting for you</string>
+</resources>

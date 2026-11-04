@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="6dp"
+    android:paddingEnd="10dp">
+
+    <!-- Pip: mostly the normal picture, briefly the alternate one (blink, hop or steam). -->
+    <ViewFlipper
+        android:id="@+id/widget_pip"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:autoStart="true"
+        android:flipInterval="700">
+
+        <ImageView
+            android:id="@+id/widget_pip_1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/pip_calm" />
+
+        <ImageView
+            android:id="@+id/widget_pip_2"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/pip_calm" />
+
+        <ImageView
+            android:id="@+id/widget_pip_3"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/pip_calm" />
+
+        <ImageView
+            android:id="@+id/widget_pip_alt"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/pip_calm_alt" />
+    </ViewFlipper>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_streak"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:text="0 days"
+            android:textColor="#F2F4F8"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_grade"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:text="Grade –"
+            android:textColor="#C9D0DC"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>
