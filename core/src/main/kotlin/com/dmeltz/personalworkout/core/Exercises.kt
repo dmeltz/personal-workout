@@ -17,7 +17,9 @@ enum class Muscle(val label: String) {
     SHOULDERS("Shoulders"),
     BICEPS("Biceps"),
     TRICEPS("Triceps"),
-    FOREARMS("Forearms and grip"),
+    FOREARMS("Forearms"),
+    WRISTS("Wrists"),
+    HANDS("Hands and grip"),
     ABS("Abs"),
     OBLIQUES("Obliques"),
     UPPER_BACK("Upper back"),
@@ -27,6 +29,7 @@ enum class Muscle(val label: String) {
     QUADS("Quads"),
     HAMSTRINGS("Hamstrings"),
     CALVES("Calves"),
+    FEET("Feet and ankles"),
 }
 
 /**

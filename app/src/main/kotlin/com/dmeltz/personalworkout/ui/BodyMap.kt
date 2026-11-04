@@ -42,20 +42,26 @@ private val areas = listOf(
     Area(Muscle.SHOULDERS, false, 33f, 26f, 5f, 5f),
     Area(Muscle.CHEST, false, 43f, 32f, 7f, 5f),
     Area(Muscle.BICEPS, false, 29.5f, 37f, 3.3f, 7f),
-    Area(Muscle.FOREARMS, false, 26f, 55f, 2.8f, 8f),
+    Area(Muscle.FOREARMS, false, 26.3f, 53.5f, 2.8f, 7.5f),
+    Area(Muscle.WRISTS, false, 25.5f, 63.3f, 2.3f, 1.5f),
+    Area(Muscle.HANDS, false, 25.2f, 67.6f, 2.6f, 2.9f),
     Area(Muscle.OBLIQUES, false, 40.5f, 50f, 2.6f, 7.5f),
     Area(Muscle.QUADS, false, 44f, 78f, 4.6f, 11f),
     Area(Muscle.CALVES, false, 44f, 100f, 2.5f, 6f),
+    Area(Muscle.FEET, false, 45.8f, 111.8f, 3.4f, 2.2f),
     // Back
     Area(Muscle.UPPER_BACK, true, 50f, 29f, 12f, 6.5f, mirror = false),
     Area(Muscle.SHOULDERS, true, 33f, 26f, 5f, 5f),
     Area(Muscle.TRICEPS, true, 29.5f, 37f, 3.3f, 7f),
-    Area(Muscle.FOREARMS, true, 26f, 55f, 2.8f, 8f),
+    Area(Muscle.FOREARMS, true, 26.3f, 53.5f, 2.8f, 7.5f),
+    Area(Muscle.WRISTS, true, 25.5f, 63.3f, 2.3f, 1.5f),
+    Area(Muscle.HANDS, true, 25.2f, 67.6f, 2.6f, 2.9f),
     Area(Muscle.LATS, true, 41.5f, 43f, 5f, 8.5f),
     Area(Muscle.LOWER_BACK, true, 46.5f, 55f, 3f, 5.5f),
     Area(Muscle.GLUTES, true, 44.5f, 67f, 5.5f, 5.5f),
     Area(Muscle.HAMSTRINGS, true, 44f, 82f, 4.3f, 9f),
     Area(Muscle.CALVES, true, 44f, 100f, 3.4f, 7f),
+    Area(Muscle.FEET, true, 44f, 111.5f, 3f, 2.4f),
 )
 
 /**
@@ -93,7 +99,7 @@ private fun DrawScope.drawView(colors: Map<Muscle, Color>, back: Boolean, ox: Fl
     for (side in listOf(1f, -1f)) {
         fun x(v: Float) = 50f + (v - 50f) * side
         limb(x(33f), 24f, x(28.5f), 45f, x(25.5f), 64f, width = 8f)
-        limb(x(25.5f), 64f, x(25f), 68f, width = 5f)
+        limb(x(25.5f), 64f, x(25f), 69f, width = 6f)
         limb(x(44f), 66f, x(44f), 92f, x(44f), 110f, width = 10f)
         limb(x(44f), 110f, x(44f + 4f * (if (back) 0f else 1f)), 114f, width = 5f)
     }
