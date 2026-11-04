@@ -23,7 +23,10 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
-/** A daily notification at the chosen time, skipped when today's practice is already done. */
+/**
+ * A daily notification at the chosen time when today's workout is still to do, or when tomorrow
+ * morning is the weekly weigh-in.
+ */
 object Reminders {
     private const val CHANNEL_ID = "daily_reminder"
     private const val NOTIFICATION_ID = 1
@@ -49,7 +52,10 @@ object Reminders {
 
     fun notifyIfNeeded(context: Context) {
         val state = Repository.get(context).state
-        if (state.practicedOn(today())) return
+        val trainingDue = !state.dayDone(today()) && !state.isRestDay(today())
+        // Tomorrow's weigh-in: remind the evening before, so it happens first thing in the morning.
+        val weighInDue = state.weighInDue(today() + 1) && state.weights.isNotEmpty()
+        if (!trainingDue && !weighInDue) return
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
@@ -63,10 +69,16 @@ object Reminders {
             context, 0, Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val text = Mascot.greeting(currentMood(state), state.streak(today()), today())
+        val weighIn = "Weigh-in tomorrow morning, before breakfast."
+        val text = when {
+            trainingDue && weighInDue -> Mascot.greeting(currentMood(state), state, today()) + " " + weighIn
+            trainingDue -> Mascot.greeting(currentMood(state), state, today())
+            else -> weighIn
+        }
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(context.getString(R.string.reminder_title))
+            .setContentTitle(if (trainingDue) context.getString(R.string.reminder_title) else "Weekly weigh-in")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentText(text)
             .setContentIntent(open)
             .setAutoCancel(true)

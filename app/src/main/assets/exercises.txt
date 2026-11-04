@@ -1,0 +1,363 @@
+// Personal Workout exercise library.
+// Format: see LibraryParser in core. Each exercise is a ladder of variations, easiest first.
+// "start" is the variation a new exercise begins on (1 = first). "intro" orders when exercises join
+// the plan: all intro 1 exercises are in the first week, the rest come in one at a time.
+// Ranges are per set (reps, or seconds). Per-side exercises: the range is per side.
+// The goal is muscle build-up, so most ranges sit around 6-15 reps, and harder variations replace endless reps.
+
+// ───────────────────────────── PUSH ─────────────────────────────
+
+@exercise PUSHUP
+title: Push-up
+group: push
+measure: reps
+sets: 2
+rest: 60
+start: 2
+intro: 1
+figure: PUSHUP
+cue: Body in one straight line from head to heels: squeeze glutes and brace your belly.
+cue: Hands a little wider than shoulders, elbows about 45° from your body, not flared out.
+cue: Lower until your chest is a fist from the floor, then push the floor away.
+variation: Incline push-up | 8-15 | Hands on a sturdy table, counter or windowsill. The higher the surface, the easier.
+variation: Push-up | 6-15 | Hands on the floor.
+cue: If your hips sag, rest and finish the set on a table instead.
+variation: Slow push-up | 6-12 | 3 seconds down, 1 second pause just above the floor, then push up.
+variation: Feet-elevated push-up | 6-12 | Feet on a chair or step, hands on the floor.
+cue: Keep your hips in line: the raised feet make them want to pike up.
+variation: Archer push-up | 4-10 | Hands very wide. Lower toward one hand while the other arm stays almost straight. Alternate sides; count each side as one rep.
+
+@exercise PIKE
+title: Pike push-up
+group: push
+measure: reps
+sets: 2
+rest: 60
+start: 1
+intro: 2
+figure: PIKE
+cue: Hips high so your body makes an upside-down V. Most of your weight goes on your hands.
+cue: Lower the top of your head toward a spot a little in front of your hands, elbows pointing back, not out.
+cue: Push back up until your arms are straight. Shoulders do the work.
+variation: Pike push-up | 5-12 | Feet on the floor, walked in close to your hands.
+variation: Slow pike push-up | 5-12 | 3 seconds down, then push up.
+variation: Feet-elevated pike push-up | 5-10 | Feet on a chair, hips stacked as high above your shoulders as you can.
+cue: Start with your knees bent if your hamstrings are tight.
+
+@exercise CLOSE_PUSHUP
+title: Close-grip push-up
+group: push
+measure: reps
+sets: 2
+rest: 60
+start: 1
+intro: 4
+figure: PUSHUP
+cue: Hands shoulder-width or a little closer, directly under your shoulders.
+cue: Elbows brush your ribs on the way down. This moves the work to the triceps.
+cue: Body stays in one straight line, same as a normal push-up.
+variation: Close-grip incline push-up | 8-15 | Hands on a table or counter.
+variation: Close-grip push-up | 6-12 | Hands on the floor.
+variation: Diamond push-up | 5-12 | Index fingers and thumbs touch to make a diamond under your chest.
+cue: If your wrists or elbows complain, go back to the close-grip version.
+
+// ───────────────────────────── PULL ─────────────────────────────
+
+@exercise DEAD_HANG
+title: Hang from the bar
+group: pull
+measure: seconds
+sets: 2
+rest: 60
+start: 2
+intro: 1
+equipment: pull-up bar
+figure: HANG
+cue: Overhand grip, hands a little wider than your shoulders, thumbs around the bar.
+cue: Breathe normally. Stop the set when your grip starts to slip, not after.
+variation: Supported hang | 20-45 | Feet on a chair under the bar, carrying some of your weight.
+variation: Dead hang | 20-60 | Hang with your whole weight, arms straight and shoulders relaxed.
+variation: Active hang | 20-50 | Pull your shoulders down away from your ears without bending your arms, and hold that.
+cue: Your body rises a few centimeters when you pull your shoulders down. That's the move.
+variation: Flexed-arm hang | 10-30 | Jump or step up so your chin is over the bar, and hold it there.
+
+@exercise PULLUP
+title: Pull-up
+group: pull
+measure: reps
+sets: 2
+rest: 90
+start: 2
+intro: 1
+equipment: pull-up bar
+figure: PULLUP
+cue: Overhand grip, a little wider than your shoulders.
+cue: Start each rep by pulling your shoulders down, then drive your elbows down toward your hips.
+cue: Lower all the way to straight arms under control. No swinging or kicking.
+variation: Scapular pull-up | 6-12 | Hang with straight arms and only pull your shoulders down and back, then relax. Small movement.
+variation: Negative pull-up | 3-6 | Step up on a chair so your chin is over the bar, then lower yourself as slowly as you can, about 5 seconds.
+cue: Step back up for each rep. Don't jump into the next one.
+variation: Pull-up | 2-8 | Full pull-ups from a dead hang until your chin is over the bar.
+cue: Can't get one more full rep? Finish the set with slow negatives and log the full reps only.
+variation: Slow pull-up | 3-8 | 2 seconds up, a short pause with your chin over the bar, 3 seconds down.
+
+@exercise CHINUP
+title: Chin-up
+group: pull
+measure: reps
+sets: 2
+rest: 90
+start: 1
+intro: 3
+equipment: pull-up bar
+figure: PULLUP
+cue: Underhand grip (palms toward you), hands shoulder-width apart.
+cue: Pull your chest toward the bar, elbows close to your sides. Biceps work harder than in pull-ups.
+cue: Lower all the way to straight arms under control.
+variation: Negative chin-up | 3-6 | Step up on a chair with your chin over the bar, then lower yourself in about 5 seconds.
+variation: Chin-up | 2-8 | Full chin-ups from a dead hang.
+variation: Slow chin-up | 3-8 | 2 seconds up, a short pause at the top, 3 seconds down.
+
+@exercise TOWEL_ROW
+title: Door towel row
+group: pull
+measure: reps
+sets: 2
+rest: 60
+start: 1
+intro: 2
+equipment: a towel and a sturdy door
+figure: ROW
+cue: Loop a towel around both handles of a closed door (or a post in the yard). Hold one end in each hand.
+cue: Feet close to the door, lean back with straight arms and a straight body.
+cue: Pull your chest toward the door, squeezing your shoulder blades together, then lower slowly.
+cue: Check that the door is closed and latched, and pull on its handle side only if it opens away from you.
+variation: Upright towel row | 8-15 | Lean back only a little. Walk your feet back to make it easier.
+variation: Towel row | 8-15 | Walk your feet closer to the door so you lean back further.
+variation: Slow towel row | 8-15 | Lean back as far as you control. Pause 2 seconds at the top of each rep.
+variation: One-arm towel row | 5-10 | Hold both towel ends in one hand, other hand on your chest. Do all the reps on one side, then the other.
+
+// ───────────────────────────── LEGS ─────────────────────────────
+
+@exercise SQUAT
+title: Squat
+group: legs
+measure: reps
+sets: 2
+rest: 60
+start: 2
+intro: 1
+figure: SQUAT
+cue: Feet shoulder-width, toes turned out a little. Arms forward for balance.
+cue: Sit back and down, knees pointing the same way as your toes. Keep your heels down.
+cue: Chest up, back neutral. Go as deep as you can while your heels stay down and your back stays straight.
+variation: Chair squat | 10-20 | Sit down to a chair, touch lightly without resting, and stand up.
+variation: Squat | 12-25 | Bodyweight squat, thighs at least parallel to the floor.
+variation: Pause squat | 10-20 | Hold the bottom position 3 seconds on every rep.
+variation: Cossack squat | 6-12 | Very wide stance. Sit down over one leg while the other stays straight, toes up. Alternate sides; count each side.
+variation: Assisted pistol squat | 4-10 | On one leg, holding the door frame lightly. Sit back to a low chair. Count each leg.
+
+@exercise SPLIT_SQUAT
+title: Split squat
+group: legs
+measure: reps
+sets: 2
+rest: 45
+start: 2
+intro: 2
+per side: yes
+figure: SPLIT
+cue: Long stride: front foot flat, back heel up. Most of your weight on the front leg.
+cue: Lower straight down until your back knee almost touches the floor. Torso upright.
+cue: Front knee follows the toes. Push up through the front heel.
+variation: Supported split squat | 8-15 | Hold a wall or chair for balance.
+variation: Split squat | 8-15 | No support.
+variation: Bulgarian split squat | 6-12 | Back foot on a chair or couch behind you.
+cue: Hop your front foot forward if your front knee travels far past your toes.
+variation: Slow Bulgarian split squat | 6-12 | Back foot raised, 3 seconds down every rep.
+
+@exercise GLUTE_BRIDGE
+title: Glute bridge
+group: legs
+measure: reps
+sets: 2
+rest: 45
+start: 2
+intro: 1
+figure: BRIDGE
+cue: Lie on your back, knees bent, feet flat near your hips.
+cue: Push through your heels and lift your hips until your body is straight from knees to shoulders.
+cue: Squeeze your glutes at the top for a second. Don't arch your lower back.
+variation: Glute bridge | 12-25 | Both feet on the floor.
+variation: Single-leg glute bridge | 8-15 | One foot on the floor, the other leg straight up or held to your chest. Do both legs.
+cue: The reps count per leg.
+variation: Single-leg hip thrust | 8-15 | Shoulders on the couch or a chair, one foot on the floor. Do both legs.
+
+@exercise CALF_RAISE
+title: Calf raise
+group: legs
+measure: reps
+sets: 2
+rest: 45
+start: 1
+intro: 3
+figure: CALF
+cue: Rise all the way up onto the balls of your feet, pause, then lower slowly.
+cue: Hold a wall or door frame lightly for balance only.
+variation: Calf raise | 15-30 | Both feet, on flat ground.
+variation: Calf raise on a step | 12-25 | Balls of your feet on a step, heels lower below the step at the bottom.
+variation: Single-leg calf raise | 10-20 | One foot on the step. Count each leg.
+
+@exercise STEP_UP
+title: Step-up
+group: legs
+measure: reps
+sets: 2
+rest: 45
+start: 1
+intro: 4
+per side: yes
+figure: STEPUP
+equipment: a sturdy step, bench or chair
+cue: Whole foot on the step. Push through that heel to stand up tall.
+cue: Don't push off with the back foot: let it hang and just tap the step at the top.
+cue: Lower slowly back down with the same leg.
+variation: Low step-up | 10-15 | A stair or step about knee-low.
+variation: High step-up | 8-15 | A chair or bench about knee height.
+variation: Slow high step-up | 8-12 | Knee-high step, 3 seconds on the way down.
+
+// ───────────────────────────── CORE ─────────────────────────────
+
+@exercise PLANK
+title: Plank
+group: core
+measure: seconds
+sets: 2
+rest: 45
+start: 2
+intro: 1
+figure: PLANK
+cue: Elbows under your shoulders, body in one straight line.
+cue: Squeeze your glutes and pull your belly button in. Don't let your hips sag or pike up.
+cue: Breathe normally throughout.
+variation: Knee plank | 20-45 | Knees on the floor instead of feet.
+variation: Plank | 20-60 | On forearms and toes.
+variation: Long-lever plank | 20-45 | Elbows a hand's length further forward than your shoulders.
+variation: Plank with leg lift | 20-45 | Lift one foot a few centimeters, swapping every 5 seconds, hips level.
+
+@exercise SIDE_PLANK
+title: Side plank
+group: core
+measure: seconds
+sets: 2
+rest: 30
+start: 1
+intro: 2
+per side: yes
+figure: SIDEPLANK
+cue: Elbow right under your shoulder. Body in a straight line from head to feet.
+cue: Push your hips up and slightly forward. Don't let them drop toward the floor.
+variation: Knee side plank | 15-40 | Knees bent and on the floor.
+variation: Side plank | 15-45 | Feet stacked, or one in front of the other for balance.
+variation: Side plank with top leg raised | 15-30 | Lift the top leg and hold it up.
+
+@exercise DEAD_BUG
+title: Dead bug
+group: core
+measure: reps
+sets: 2
+rest: 30
+start: 1
+intro: 1
+figure: DEADBUG
+cue: Lie on your back, arms straight up, knees bent at 90° above your hips.
+cue: Press your lower back into the floor and keep it there the whole time.
+cue: Slowly extend the opposite arm and leg toward the floor, return, and switch. Each side is one rep.
+variation: Dead bug | 8-16 | Opposite arm and leg, slow and controlled.
+variation: Slow dead bug | 8-16 | Take 3 seconds to extend, breathe out fully as you do.
+variation: Straight-leg dead bug | 8-14 | Legs start straight up toward the ceiling.
+
+@exercise BIRD_DOG
+title: Bird dog
+group: core
+measure: reps
+sets: 2
+rest: 30
+start: 1
+intro: 3
+figure: BIRDDOG
+cue: On hands and knees, hands under shoulders, knees under hips, back flat.
+cue: Reach one arm forward and the opposite leg back until both are level with your body.
+cue: Hips stay square to the floor. Hold 2 seconds, return, switch. Each side is one rep.
+variation: Bird dog | 8-16 | Slow, with a 2-second hold.
+variation: Bird dog with elbow-to-knee | 8-14 | After the reach, bring elbow and knee together under your body, then reach again.
+variation: Superman | 8-15 | Lie face down and lift your arms, chest and legs a little off the floor. Hold 2 seconds.
+
+@exercise KNEE_RAISE
+title: Hanging knee raise
+group: core
+measure: reps
+sets: 2
+rest: 60
+start: 1
+intro: 2
+equipment: pull-up bar
+figure: KNEERAISE
+cue: Hang with your shoulders pulled down a little, not shrugged up to your ears.
+cue: Raise your knees by curling your pelvis up, not by swinging. Lower slowly.
+variation: Lying knee tuck | 10-20 | On your back, hands by your sides. Bring your knees to your chest and lift your hips slightly.
+variation: Hanging knee raise | 6-15 | From the bar, knees up to hip height.
+variation: Hanging knee-to-chest | 6-12 | Knees all the way up toward your chest, curling your pelvis.
+variation: Hanging leg raise | 5-12 | Straight legs up to hip height.
+
+// ───────────────────────────── CONDITIONING ─────────────────────────────
+
+@exercise BAG
+title: Bag rounds
+group: conditioning
+measure: seconds
+sets: 2
+rest: 45
+start: 1
+intro: 2
+equipment: boxing bag
+figure: BAG
+cue: Stand side-on, hands up guarding your chin, knees soft. Keep moving your feet.
+cue: Punch with your whole body: turn your hip and shoulder into it, and bring the hand straight back to your face.
+cue: Breathe out on every punch. Wrap or glove your hands so your wrists stay straight.
+variation: Steady round | 30-60 | Jab and cross at a steady pace.
+variation: Moving round | 30-75 | Jab, cross and hooks, moving around the bag.
+variation: Power round | 30-60 | Hard combinations of 3-4 punches, short rest inside the round.
+
+@exercise BEAR_CRAWL
+title: Bear crawl
+group: conditioning
+measure: seconds
+sets: 2
+rest: 45
+start: 1
+intro: 4
+figure: BEAR
+cue: On hands and feet, knees bent and hovering a few centimeters above the ground.
+cue: Back flat and hips low, about level with your shoulders.
+cue: Move the opposite hand and foot together, small steps. On grass if you can.
+variation: Bear hold | 15-40 | Hold the position without moving.
+variation: Bear crawl | 15-45 | Crawl forward and back.
+variation: Lateral bear crawl | 15-45 | Crawl sideways, both directions.
+
+// ───────────────────────────── WARM-UP ─────────────────────────────
+
+@warmup
+move: March on the spot, swinging your arms | 30
+move: Arm circles, forward then back | 20
+move: Hip circles | 20
+move: Bodyweight good mornings (hinge at the hips, flat back) | 20
+move: Shoulder rolls and neck turns | 20
+
+// ───────────────────────────── SAFETY ─────────────────────────────
+
+@safety
+line: Stop the exercise if anything hurts: sharp pain, joint pain, or pain that gets worse as you go. Normal muscle burn is fine; pain is not.
+line: Stop and rest if you feel dizzy, short of breath beyond normal effort, or chest pain. Get medical help for chest pain.
+line: Skip or ease off an exercise when a joint is sore, and tap "Skip / couldn't do it". The app will ease that exercise off.
+line: Good form first: fewer clean reps build more muscle than many sloppy ones.

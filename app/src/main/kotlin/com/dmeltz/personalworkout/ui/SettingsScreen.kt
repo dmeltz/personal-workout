@@ -20,12 +20,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material3.FilterChip
 import com.dmeltz.personalworkout.core.AppState
+import com.dmeltz.personalworkout.core.Library
 
+private val WEEKDAYS = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     state: AppState,
-    itemCount: Int,
+    library: Library,
     version: String,
     onState: (AppState) -> Unit,
     onExport: () -> Unit,
@@ -40,7 +47,7 @@ fun SettingsScreen(
             Text("Daily reminder", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Remind me at %02d:%02d if I haven't practiced".format(state.reminderHour, state.reminderMinute),
+                    "Remind me at %02d:%02d if I haven't trained".format(state.reminderHour, state.reminderMinute),
                     modifier = Modifier.weight(1f),
                 )
                 Switch(checked = state.reminderEnabled, onCheckedChange = { onState(state.copy(reminderEnabled = it)) })
@@ -52,20 +59,40 @@ fun SettingsScreen(
             }) { Text("Change reminder time") }
 
             HorizontalDivider()
-            Text("Send my answers to Claude", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Rest days", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Planned rest days don't break your streak. Mark capoeira days on the home screen.")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WEEKDAYS.forEachIndexed { i, name ->
+                    val wd = i + 1
+                    FilterChip(
+                        selected = wd in state.restWeekdays,
+                        onClick = {
+                            val days = if (wd in state.restWeekdays) state.restWeekdays - wd else (state.restWeekdays + wd).sorted()
+                            onState(state.copy(restWeekdays = days))
+                        },
+                        label = { Text(name) },
+                    )
+                }
+            }
+
+            HorizontalDivider()
+            SafetyCard(library.safety, onOk = null)
+
+            HorizontalDivider()
+            Text("Send my history to Claude", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             SyncPanel()
 
             HorizontalDivider()
-            Text("Share my answers as a file", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("Saves your progress and every answer, including all mistakes, as one file you can share.")
-            OutlinedButton(onClick = onExport) { Text("Export answer log") }
+            Text("Export my history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Saves your progress and every logged exercise as one JSON file you can share or keep.")
+            OutlinedButton(onClick = onExport) { Text("Export history") }
 
             HorizontalDivider()
             Text("App updates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             UpdatePanel(compact = false)
 
             HorizontalDivider()
-            Text("Version $version · $itemCount practice items", style = MaterialTheme.typography.bodySmall)
+            Text("Version $version · ${library.exercises.size} exercises", style = MaterialTheme.typography.bodySmall)
         }
     }
 }

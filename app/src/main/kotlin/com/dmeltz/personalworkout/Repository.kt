@@ -1,12 +1,13 @@
 package com.dmeltz.personalworkout
 
 import android.content.Context
-import com.dmeltz.personalworkout.core.AnswerRecord
 import com.dmeltz.personalworkout.core.AppState
-import com.dmeltz.personalworkout.core.Curriculum
-import com.dmeltz.personalworkout.core.CurriculumParser
 import com.dmeltz.personalworkout.core.Day
-import com.dmeltz.personalworkout.core.Mastery
+import com.dmeltz.personalworkout.core.Group
+import com.dmeltz.personalworkout.core.Library
+import com.dmeltz.personalworkout.core.LibraryParser
+import com.dmeltz.personalworkout.core.Progression
+import com.dmeltz.personalworkout.core.WorkoutRecord
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -16,16 +17,15 @@ import java.time.LocalDateTime
 
 fun today(): Day = LocalDate.now().toEpochDay()
 
-/** Loads the curriculum and keeps the progress state and the answer log in the app's private files. */
+/** Loads the exercise library and keeps the progress state and the workout log in the app's private files. */
 class Repository private constructor(private val context: Context) {
 
-    val curriculum: Curriculum by lazy {
-        fun asset(name: String) = context.assets.open(name).bufferedReader().use { it.readText() }
-        CurriculumParser.parse(asset("curriculum.txt"), asset("rule_details.txt"))
+    val library: Library by lazy {
+        LibraryParser.parse(context.assets.open("exercises.txt").bufferedReader().use { it.readText() })
     }
 
     private val stateFile = File(context.filesDir, "state.json")
-    private val logFile = File(context.filesDir, "answers.jsonl")
+    private val logFile = File(context.filesDir, "workouts.jsonl")
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     @Volatile
@@ -49,25 +49,28 @@ class Repository private constructor(private val context: Context) {
     }
 
     @Synchronized
-    fun appendAnswer(record: AnswerRecord) {
+    fun appendRecord(record: WorkoutRecord) {
         logFile.appendText(json.encodeToString(record) + "\n")
     }
 
-    fun answers(): List<AnswerRecord> {
+    fun records(): List<WorkoutRecord> {
         if (!logFile.exists()) return emptyList()
         return logFile.readLines().filter { it.isNotBlank() }.mapNotNull {
-            runCatching { json.decodeFromString<AnswerRecord>(it) }.getOrNull()
+            runCatching { json.decodeFromString<WorkoutRecord>(it) }.getOrNull()
         }
     }
 
     @Serializable
-    data class RuleSummary(
+    data class ExerciseSummary(
         val id: String,
         val title: String,
+        val group: Group,
         val started: Boolean,
-        val scorePercent: Int,
-        val answers: Int,
-        val correctAnswers: Int,
+        val variation: String?,
+        val target: Int?,
+        val sets: Int?,
+        val level: Double?,
+        val times: Int,
     )
 
     @Serializable
@@ -75,13 +78,14 @@ class Repository private constructor(private val context: Context) {
         val exportedAt: String,
         val appVersion: String,
         val streak: Int,
-        val averageGrade: Int?,
-        val rules: List<RuleSummary>,
+        val overallLevel: Double?,
+        val groupLevels: Map<String, Double>,
+        val exercises: List<ExerciseSummary>,
         val state: AppState,
-        val answers: List<AnswerRecord>,
+        val workouts: List<WorkoutRecord>,
     )
 
-    /** Everything (progress and every answer) as one JSON document. */
+    /** Everything (progress and every logged exercise) as one JSON document. */
     fun exportJson(): String {
         val day = today()
         val s = state
@@ -89,20 +93,24 @@ class Repository private constructor(private val context: Context) {
             exportedAt = LocalDateTime.now().toString(),
             appVersion = BuildConfigInfo.versionName(context),
             streak = s.streak(day),
-            averageGrade = s.averageGrade(day),
-            rules = curriculum.rules.map { rule ->
-                val stats = s.ruleStats(rule.id)
-                RuleSummary(
-                    id = rule.id,
-                    title = rule.title,
-                    started = stats.introduced,
-                    scorePercent = Math.round(Mastery.score(stats, day) * 100).toInt(),
-                    answers = stats.answers,
-                    correctAnswers = stats.correctAnswers,
+            overallLevel = Progression.overallLevel(library, s),
+            groupLevels = Group.entries.mapNotNull { g -> Progression.groupLevel(library, s, g)?.let { g.name to it } }.toMap(),
+            exercises = library.exercises.map { ex ->
+                val es = s.exerciseState(ex.id)
+                ExerciseSummary(
+                    id = ex.id,
+                    title = ex.title,
+                    group = ex.group,
+                    started = es != null,
+                    variation = es?.let { ex.variation(it.variation).name },
+                    target = es?.target,
+                    sets = es?.sets,
+                    level = es?.let { Progression.level(ex, it) },
+                    times = es?.times ?: 0,
                 )
             },
             state = s,
-            answers = answers(),
+            workouts = records(),
         )
         return Json { encodeDefaults = true; prettyPrint = true }.encodeToString(export)
     }

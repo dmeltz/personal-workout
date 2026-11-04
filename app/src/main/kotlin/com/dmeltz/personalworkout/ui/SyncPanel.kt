@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
-/** Settings for sending the answers to a private GitHub repository after every practice. */
+/** Settings for sending the workout history to a private GitHub repository after every session. */
 @Composable
 fun SyncPanel() {
     val context = LocalContext.current
@@ -37,8 +37,8 @@ fun SyncPanel() {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            "After every practice, the app sends your progress and every answer to a private GitHub repository. " +
-                "Claude reads it there when you ask for an update, and adjusts the practice to your mistakes.",
+            "After every workout, the app sends your full history to a private GitHub repository. " +
+                "Claude reads it there when you ask for an update, and tunes the plan and the exercises to how you're doing.",
         )
         OutlinedTextField(
             value = repo,
@@ -80,7 +80,7 @@ fun SyncPanel() {
             settings.lastError != null -> "Last try didn't work: ${settings.lastError}"
             settings.lastSentAt != null ->
                 "Last sent " + DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(settings.lastSentAt!!)) + "."
-            else -> "Saved. Answers will be sent after your next practice."
+            else -> "Saved. Your history will be sent after your next workout."
         }
         if (status != null) Text(status, style = MaterialTheme.typography.bodySmall)
     }

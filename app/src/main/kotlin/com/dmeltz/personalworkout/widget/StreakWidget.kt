@@ -14,7 +14,7 @@ import com.dmeltz.personalworkout.currentMood
 import com.dmeltz.personalworkout.today
 import com.dmeltz.personalworkout.ui.pipDrawable
 
-/** 2x1 home screen widget: Pip (angrier as the day goes by without practice), streak and average grade. */
+/** 2x1 home screen widget: Pip (angrier as the day goes by without training), streak and overall level. */
 class StreakWidget : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
@@ -32,7 +32,8 @@ class StreakWidget : AppWidgetProvider() {
             val state = Repository.get(context).state
             val day = today()
             val streak = state.streak(day)
-            val grade = state.averageGrade(day)
+            val repo = Repository.get(context)
+            val level = com.dmeltz.personalworkout.core.Progression.overallLevel(repo.library, state)
             val mood = currentMood(state)
 
             val open = PendingIntent.getActivity(
@@ -46,7 +47,15 @@ class StreakWidget : AppWidgetProvider() {
                 }
                 setImageViewResource(R.id.widget_pip_alt, pipDrawable(mood, alt = true))
                 setTextViewText(R.id.widget_streak, if (streak == 1) "1 day" else "$streak days")
-                setTextViewText(R.id.widget_grade, "Grade " + (grade?.let { "$it%" } ?: "–"))
+                setTextViewText(
+                    R.id.widget_grade,
+                    when {
+                        state.trainedOn(day) -> "Done today ✓"
+                        state.isCapoeira(day) -> "Capoeira day"
+                        state.isRestDay(day) -> "Rest day"
+                        else -> "Level " + (level?.let { "%.1f".format(it) } ?: "–")
+                    },
+                )
                 setOnClickPendingIntent(R.id.widget_root, open)
             }
         }

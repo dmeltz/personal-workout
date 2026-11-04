@@ -1,7 +1,7 @@
 package com.dmeltz.personalworkout.core
 
 import java.io.File
-import kotlin.random.Random
+import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,262 +9,174 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CoreTest {
-    private val sample = """
-        @rule SP01
-        category: spelling
-        title: Doubling
-        reminder: Double it.
-        example: run → running
-        T: הם הפסיקו לדבר = They [stopped] talking.
-        L: [beginning]
-        F: הוא רץ | He is runing. = He is [running]. #GR04
+    private val library = LibraryParser.parse(File("../app/src/main/assets/exercises.txt").readText())
+    private val monday: Day = LocalDate.of(2026, 11, 2).toEpochDay()
 
-        @rule GR04
-        category: grammar
-        title: Present continuous
-        reminder: Now: am / is / are + -ing.
-        T: אני עובד עכשיו = I am working now. || I am working at the moment.
-    """.trimIndent()
+    private fun ex(id: String) = library.exercise(id)!!
 
-    private val curriculum = CurriculumParser.parse(sample)
-
-    @Test fun parsesRulesAndItems() {
-        assertEquals(listOf("SP01", "GR04"), curriculum.rules.map { it.id })
-        assertEquals(4, curriculum.items.size)
-        val fix = curriculum.item("SP01-03")!!
-        assertEquals(ExerciseType.FIX, fix.type)
-        assertEquals("He is runing.", fix.wrong)
-        assertEquals(listOf("SP01", "GR04"), fix.ruleIds)
-        assertEquals("He is running.", fix.displayAnswer)
-        assertEquals(2, curriculum.item("GR04-01")!!.answers.size)
+    @Test fun libraryIsComplete() {
+        assertTrue(library.exercises.size >= 15)
+        for (g in Group.entries) assertTrue(library.inGroup(g).isNotEmpty(), "no exercises for $g")
+        for (e in library.exercises) {
+            assertNotNull(Figures.all[e.figure], "${e.id} has no figure ${e.figure}")
+            assertTrue(e.cues.size >= 2, "${e.id} needs form cues")
+            assertTrue(e.variations.all { it.how.isNotBlank() }, "${e.id} has a variation without a description")
+        }
+        assertTrue(library.warmup.isNotEmpty())
+        assertTrue(library.safety.any { "hurt" in it })
+        for (f in Figures.all.values) assertEquals(Pose.JOINTS * 2, f.start.points.size)
     }
 
-    @Test fun acceptsCaseContractionsAndPunctuation() {
-        val item = curriculum.item("GR04-01")!!
-        assertTrue(AnswerChecker.check(item, "i'm working now").correct)
-        assertTrue(AnswerChecker.check(item, "I’m working at the moment!").correct)
-        assertFalse(AnswerChecker.check(item, "I working now").correct)
+    @Test fun weekdays() {
+        assertEquals(1, weekday(monday))
+        assertEquals(6, weekday(monday + 5))
+        assertEquals(7, weekday(monday + 6))
     }
 
-    @Test fun keepsItsAndItsDifferent() {
-        val a = AnswerChecker.canonicalTokens("It is too late.")
-        val b = AnswerChecker.canonicalTokens("Its too late")
-        assertTrue(a != b)
-        assertEquals(a, AnswerChecker.canonicalTokens("It's too late"))
-        assertEquals(AnswerChecker.canonicalTokens("I have lived here"), AnswerChecker.canonicalTokens("I've lived here"))
-        assertTrue(AnswerChecker.canonicalTokens("He has two kids") != AnswerChecker.canonicalTokens("He's two kids"))
+    @Test fun easyMovesUpAndThenToTheNextVariation() {
+        val pushup = ex("PUSHUP")
+        var s = Progression.initial(pushup, monday)
+        assertEquals(1, s.variation)
+        assertEquals(6, s.target)
+        s = Progression.apply(pushup, s, listOf(6, 6), Effort.EASY, monday)
+        assertEquals(8, s.target)
+        s = Progression.apply(pushup, s, listOf(8, 8), Effort.OK, monday + 1)
+        assertEquals(9, s.target)
+        s = s.copy(target = 15)
+        s = Progression.apply(pushup, s, listOf(15, 15), Effort.EASY, monday + 2)
+        assertEquals(2, s.variation)
+        assertEquals(pushup.variation(2).min, s.target)
     }
 
-    @Test fun focusPartDecidesRuleCredit() {
-        val item = curriculum.item("SP01-01")!!
-        val typo = AnswerChecker.check(item, "They stopped talkng")
-        assertFalse(typo.correct)
-        assertTrue(typo.ruleCorrect)
-        val wrong = AnswerChecker.check(item, "They stoped talking")
-        assertFalse(wrong.ruleCorrect)
-        assertEquals(MistakeKind.MISSING_LETTER, wrong.mistake)
+    @Test fun hardHoldsAndMissesComeDown() {
+        val squat = ex("SQUAT")
+        val s = Progression.initial(squat, monday).copy(target = 18)
+        assertEquals(18, Progression.apply(squat, s, listOf(18, 18), Effort.HARD, monday).target)
+        assertEquals(15, Progression.apply(squat, s, listOf(18, 15), Effort.HARD, monday).target)
+        val twice = Progression.apply(squat, s.copy(struggles = 1), listOf(18, 18), Effort.HARD, monday)
+        assertEquals(17, twice.target)
     }
 
-    @Test fun classifiesMistakes() {
-        assertEquals(MistakeKind.SWAPPED_LETTERS, AnswerChecker.classifyWord("receive", "recieve"))
-        assertEquals(MistakeKind.EXTRA_LETTER, AnswerChecker.classifyWord("writing", "writting"))
-        assertEquals(MistakeKind.WRONG_LETTER, AnswerChecker.classifyWord("separate", "seperate"))
-        assertEquals(MistakeKind.WRONG_WORD, AnswerChecker.classifyWord("bought", "go"))
-        val order = AnswerChecker.check(
-            CurriculumParser.parse("@rule GR13\ncategory: grammar\ntitle: x\nT: x = I like it very much.").items[0],
-            "I like very much it",
-        )
-        assertEquals(MistakeKind.WORD_ORDER, order.mistake)
+    @Test fun skipsEaseOffAndDropAVariation() {
+        val pullup = ex("PULLUP")
+        var s = Progression.initial(pullup, monday)
+        assertEquals("Negative pull-up", pullup.variation(s.variation).name)
+        s = Progression.apply(pullup, s, emptyList(), Effort.SKIPPED, monday)
+        assertEquals(0, s.variation)
+        assertTrue(s.target in pullup.variation(0).min..pullup.variation(0).max)
+        assertEquals(1, s.struggles)
     }
 
-    @Test fun diffMarksMissingAndExtra() {
-        val d = TextDiff.diff("recieve", "receive")
-        assertEquals("receive", d.filter { it.kind != DiffKind.EXTRA }.joinToString("") { it.text })
-        assertEquals("recieve", d.filter { it.kind != DiffKind.MISSING }.joinToString("") { it.text })
+    @Test fun topOfTheLadderAddsASet() {
+        val calf = ex("CALF_RAISE")
+        val top = calf.variations.lastIndex
+        val s = Progression.initial(calf, monday).copy(variation = top, target = calf.variation(top).max)
+        val next = Progression.apply(calf, s, listOf(s.target, s.target), Effort.EASY, monday)
+        assertEquals(top, next.variation)
+        assertEquals(3, next.sets)
+        assertTrue(Progression.level(calf, next) > Progression.level(calf, s))
     }
 
-    @Test fun schedulerIntervals() {
-        var s = Scheduler.next(null, true, 100)
-        assertEquals(101, s.due)
-        s = Scheduler.next(s, true, 101)
-        assertEquals(104, s.due)
-        s = Scheduler.next(s, false, 104)
-        assertEquals(0, s.level)
-        assertEquals(105, s.due)
+    @Test fun levelGrowsWithProgress() {
+        val pushup = ex("PUSHUP")
+        val a = Progression.initial(pushup, monday)
+        assertEquals(2.0, Progression.level(pushup, a))
+        assertEquals(2.5, Progression.level(pushup, a.copy(target = (6 + 15) / 2 + 1)), 0.1)
+        assertEquals(3.0, Progression.level(pushup, a.copy(variation = 2, target = pushup.variation(2).min)))
     }
 
-    @Test fun masteryMovesAndDecays() {
-        var stats = RuleStats(introducedOn = 0)
-        assertEquals(0.5, Mastery.score(stats, 0), 1e-9)
-        repeat(6) { stats = Mastery.update(stats, true, 0) }
-        val fresh = Mastery.score(stats, 0)
-        assertTrue(fresh > 0.8)
-        assertTrue(Mastery.score(stats, 60) < fresh)
-        assertTrue(Mastery.score(stats, 1000) >= fresh * 0.6 - 1e-9)
-        stats = Mastery.update(stats, false, 0)
-        assertTrue(Mastery.score(stats, 0) < fresh)
+    @Test fun restDaysDontBreakTheStreak() {
+        // Saturday is the default rest day.
+        val state = AppState(sessionDays = listOf(monday + 3, monday + 4, monday + 6))
+        assertEquals(3, state.streak(monday + 6))
+        // Monday not done yet: the streak still stands.
+        assertEquals(3, state.streak(monday + 7))
+        // Missing Monday breaks it by Tuesday.
+        assertEquals(0, state.streak(monday + 8))
     }
 
-    @Test fun streakAndGrade() {
+    @Test fun capoeiraCountsForTheStreak() {
+        val state = Sessions.setCapoeira(AppState(sessionDays = listOf(monday)), monday + 1, true)
+        assertEquals(2, state.streak(monday + 1))
+        assertEquals(DayKind.CAPOEIRA, SessionBuilder.dayKind(state, monday + 1))
+        assertEquals(DayKind.AFTER_CAPOEIRA, SessionBuilder.dayKind(state, monday + 2))
+    }
+
+    @Test fun firstSessionStartsTheBasics() {
+        val plan = SessionBuilder.build(library, AppState(), monday)
+        assertTrue(plan.exerciseIds.size >= SessionBuilder.MIN_EXERCISES)
+        assertTrue(plan.startIds.size >= 5)
+        assertTrue(plan.minutes in 8..20, "first session takes ${plan.minutes} minutes")
+        val groups = plan.exerciseIds.map { ex(it).group }
+        assertTrue(groups.distinct().size >= 3)
+    }
+
+    @Test fun capoeiraDaysSkipLegs() {
+        var state = Sessions.start(library, AppState(), SessionBuilder.build(library, AppState(), monday), monday)
+        state = Sessions.setCapoeira(state.copy(activeSession = null), monday + 1, true)
+        for (day in listOf(monday + 1, monday + 2)) {
+            val plan = SessionBuilder.build(library, state, day)
+            val groups = plan.exerciseIds.map { ex(it).group }
+            assertFalse(Group.LEGS in groups, "legs on $day")
+            assertFalse(Group.CONDITIONING in groups)
+        }
+    }
+
+    @Test fun weekBalancesMuscleGroups() {
         var state = AppState()
-        state = Progress.introduceRule(state, "SP01", 10)
-        state = Progress.completeSession(state, 10)
-        state = Progress.completeSession(state.copy(), 11)
-        assertEquals(2, state.streak(11))
-        assertEquals(2, state.streak(12))
-        assertEquals(0, state.streak(13))
-        assertEquals(50, state.averageGrade(11))
-        assertEquals(listOf(10L, 11L), state.gradeHistory.map { it.day })
-    }
-
-    @Test fun firstSessionStartsTwoRulesAndFillsUp() {
-        val text = buildString {
-            for (r in listOf("SP01", "SP02", "GR01")) {
-                appendLine("@rule $r\ncategory: ${if (r.startsWith("SP")) "spelling" else "grammar"}\ntitle: $r")
-                repeat(10) { appendLine("L: word$r$it") }
+        val counts = mutableMapOf<Group, Int>()
+        for (d in 0 until 14) {
+            val day = monday + d
+            if (state.isRestDay(day)) continue
+            val plan = SessionBuilder.build(library, state, day)
+            state = Sessions.start(library, state, plan, day)
+            for (id in plan.exerciseIds) {
+                state = Sessions.log(state, ex(id), listOf(100, 100, 100), Effort.OK, day)
+                counts[ex(id).group] = (counts[ex(id).group] ?: 0) + 1
             }
-        }
-        val c = CurriculumParser.parse(text)
-        val plan = SessionBuilder.build(c, AppState(), 0, Random(1))
-        assertEquals(listOf("SP01", "GR01"), plan.newRules.map { it.id })
-        assertEquals(SessionBuilder.SESSION_SIZE, plan.items.size)
-        assertEquals(plan.items.size, plan.items.toSet().size)
-
-        var state = plan.newRules.fold(AppState()) { s, r -> Progress.introduceRule(s, r.id, 0) }
-        assertTrue(SessionBuilder.newRules(c, state, 1).isEmpty())
-        assertEquals(listOf("SP02"), SessionBuilder.newRules(c, state, 2).map { it.id })
-        state = Progress.completeSession(state, 0)
-        assertEquals(SessionBuilder.SESSION_SIZE, SessionBuilder.build(c, state, 1, Random(2)).items.size)
-    }
-
-    @Test fun bundledCurriculumIsValid() {
-        val file = File("../app/src/main/assets/curriculum.txt")
-        if (!file.exists()) return
-        val c = CurriculumParser.parse(file.readText(), File("../app/src/main/assets/rule_details.txt").readText())
-        assertEquals(33, c.rules.size)
-        for (rule in c.rules) {
-            val d = c.details(rule.id)
-            assertNotNull(d, "${rule.id} has no details")
-            assertTrue(d.paragraphs.size >= 2 && d.good.size >= 4 && d.bad.size >= 4, "${rule.id} details too short")
-        }
-        for (rule in c.rules) {
-            val items = c.itemsFor(rule.id)
-            assertTrue(items.size >= 12, "${rule.id} has only ${items.size} items")
-            assertTrue(rule.reminder.isNotBlank(), "${rule.id} has no reminder")
-        }
-        val problems = mutableListOf<String>()
-        for (item in c.items) {
-            // Every accepted answer must be accepted by the checker as itself.
-            for (answer in item.answers) {
-                if (!AnswerChecker.check(item, stripFocus(answer)).correct) problems += "${item.id}: not accepted: $answer"
-                // A focus part must survive contraction folding, or a typo elsewhere could never be told apart.
-                val tokens = AnswerChecker.canonicalTokens(answer)
-                for (focus in Regex("""\[([^\]]+)]""").findAll(answer).map { it.groupValues[1] }) {
-                    val f = AnswerChecker.canonicalTokens(focus)
-                    if (tokens.windowed(f.size).none { it == f }) problems += "${item.id}: focus [$focus] in: $answer"
+            state = Sessions.finish(library, state, day)
+            // No main group two days running.
+            val yesterday = plan.exerciseIds.map { ex(it).group }.toSet()
+            val tomorrow = SessionBuilder.build(library, state, day + 1).exerciseIds.map { ex(it).group }.toSet()
+            if (!state.isRestDay(day + 1)) {
+                for (g in listOf(Group.PUSH, Group.PULL, Group.LEGS)) {
+                    assertFalse(g in yesterday && g in tomorrow, "$g on ${day} and ${day + 1}")
                 }
             }
-            // A hint must not give away a tested part.
-            item.hint?.let { hint ->
-                for (focus in Regex("""\[([^\]]+)]""").findAll(item.answers.first()).map { it.groupValues[1] }) {
-                    if (Regex("""\b${Regex.escape(focus.lowercase())}\b""").containsMatchIn(hint.lowercase())) {
-                        problems += "${item.id}: hint gives away [$focus]"
-                    }
-                }
-            }
-            assertNotNull(item.answers.firstOrNull())
-            assertEquals(
-                item.answers.first().count { it == '[' }, item.answers.first().count { it == ']' }, item.id,
-            )
         }
-        assertTrue(problems.isEmpty(), problems.joinToString("\n"))
+        for (g in listOf(Group.PUSH, Group.PULL, Group.LEGS, Group.CORE)) {
+            assertTrue((counts[g] ?: 0) >= 4, "$g only ${counts[g]} times in two weeks")
+        }
+        assertTrue(state.exercises.size > library.exercises.count { it.intro == 1 }, "no new exercises in two weeks")
+        assertEquals(12, state.streak(monday + 13))
     }
 
-    @Test fun fixItemsAcceptJustTheCorrectedPart() {
-        val c = CurriculumParser.parse(
-            """
-            @rule SP01
-            category: spelling
-            title: t
-            reminder: r
-            F: א | I prefered tea. = I [preferred] tea.
-            F: ב | They are comeing tomorrow. = They are [coming] tomorrow.
-            T: ג = I [preferred] tea.
-            """.trimIndent(),
-        )
-        val fix = c.item("SP01-01")!!
-        for (typed in listOf("I preferred tea.", "i preferred", "preferred", "preferred tea")) {
-            assertTrue(AnswerChecker.check(fix, typed).correct, typed)
-        }
-        for (typed in listOf("i prefered", "tea", "I", "preferred coffee")) {
-            assertFalse(AnswerChecker.check(fix, typed).correct, typed)
-        }
-        assertTrue(AnswerChecker.check(c.item("SP01-02")!!, "they are coming").correct)
-        assertFalse(AnswerChecker.check(c.item("SP01-02")!!, "they are").correct)
-        // Translations still need the whole sentence.
-        assertFalse(AnswerChecker.check(c.item("SP01-03")!!, "preferred").correct)
-    }
-
-    @Test fun hintsAndFirstLetters() {
-        val c = CurriculumParser.parse(
-            """
-            @rule GR01
-            category: grammar
-            title: t
-            reminder: r
-            T: היא מדברת שלוש שפות = She [speaks] three languages. ~ use: speak #GR02
-            L: [doesn't]
-            F: א | He don't know. = He [doesn't] know.
-            @rule GR02
-            category: grammar
-            title: t2
-            reminder: r2
-            """.trimIndent(),
-        )
-        val t = c.item("GR01-01")!!
-        assertEquals("use: speak", t.hint)
-        assertEquals(listOf("GR01", "GR02"), t.ruleIds)
-        assertEquals(listOf("She [speaks] three languages."), t.answers)
-        assertEquals("S… s… t… l…", t.firstLetters)
-        assertEquals(null, c.item("GR01-03")!!.hint)
-        assertEquals("H… d… k…", c.item("GR01-03")!!.firstLetters)
-    }
-
-    @Test fun pipGetsAngrierThroughTheDay() {
-        val state = AppState(reminderHour = 20)
-        assertEquals(Mood.CALM, Mascot.mood(state, 5, 9))
-        assertEquals(Mood.WAITING, Mascot.mood(state, 5, 13))
-        assertEquals(Mood.ANNOYED, Mascot.mood(state, 5, 18))
-        assertEquals(Mood.ANGRY, Mascot.mood(state, 5, 21))
-        val done = Progress.completeSession(state, 5)
-        assertEquals(Mood.HAPPY, Mascot.mood(done, 5, 23))
-        assertEquals(Mood.CALM, Mascot.mood(done, 6, 8))
-        assertEquals(Mascot.greeting(Mood.ANGRY, 3, 5), Mascot.greeting(Mood.ANGRY, 3, 5))
-    }
-
-    @Test fun sessionCanBeContinuedAndCountsProgress() {
-        val plan = SessionPlan(listOf(curriculum.rule("SP01")), curriculum.itemsFor("SP01"))
-        var state = Sessions.start(AppState(), plan, 3)
-        assertTrue(state.ruleStats("SP01").introduced)
-        assertEquals(3, state.sessionToContinue(3)!!.plannedCount)
-
-        val first = curriculum.item(state.activeSession!!.next()!!.itemId)!!
-        state = Sessions.answer(state, first, AnswerChecker.check(first, "wrong"), 3)
-        val s = state.sessionToContinue(3)!!
-        assertEquals(1, s.answeredCount)
-        assertEquals(4, s.entries.size)
-        assertTrue(s.entries.last().retry)
-        assertEquals(null, state.sessionToContinue(4))
-
-        while (state.activeSession!!.next() != null) {
-            val item = curriculum.item(state.activeSession!!.next()!!.itemId)!!
-            state = Sessions.answer(state, item, AnswerChecker.check(item, item.displayAnswer), 3)
-        }
-        assertEquals(3, state.activeSession!!.answeredCount)
-        assertEquals(2, state.activeSession!!.firstTryCorrect)
-        assertEquals(null, state.sessionToContinue(3))
-        state = Sessions.finish(state, 3)
+    @Test fun sessionLogsAndFinishes() {
+        val plan = SessionBuilder.build(library, AppState(), monday)
+        var state = Sessions.start(library, AppState(), plan, monday)
+        assertEquals(plan.exerciseIds.size, state.activeSession!!.plannedCount)
+        for (id in plan.exerciseIds) state = Sessions.log(state, ex(id), listOf(5, 5), Effort.OK, monday)
+        assertTrue(state.activeSession!!.finished)
+        state = Sessions.settle(library, state)
         assertEquals(null, state.activeSession)
-        assertTrue(state.practicedOn(3))
+        assertEquals(listOf(monday), state.sessionDays)
+        assertEquals(1, state.levelHistory.size)
+        assertEquals(1, state.streak(monday))
+    }
+}
+
+class BodyTest {
+    @Test fun weighInIsWeekly() {
+        var s = AppState()
+        assertTrue(s.weighInDue(100))
+        s = Body.snooze(s, 100)
+        assertFalse(s.weighInDue(100))
+        assertTrue(s.weighInDue(101))
+        s = Body.logWeight(s, 101, 76.0)
+        assertFalse(s.weighInDue(107))
+        assertTrue(s.weighInDue(108))
+        s = Body.logWeight(Body.logWeight(s, 108, 76.6), 108, 76.4)
+        assertEquals(2, s.weights.size)
+        assertEquals(0.4, Body.change(s, 108, 7)!!, 1e-9)
     }
 }
