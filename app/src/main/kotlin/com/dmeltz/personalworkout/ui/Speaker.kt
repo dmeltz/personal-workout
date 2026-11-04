@@ -30,6 +30,9 @@ class Speaker(context: Context) {
         if (ready) speakNow(text) else pending = text
     }
 
+    /** True while something is being read, or waits to be read once the engine is ready. */
+    val speaking: Boolean get() = pending != null || (ready && tts.isSpeaking)
+
     fun stop() {
         pending = null
         if (ready) tts.stop()

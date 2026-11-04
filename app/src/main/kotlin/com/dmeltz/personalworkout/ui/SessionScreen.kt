@@ -2,6 +2,7 @@ package com.dmeltz.personalworkout.ui
 
 import android.media.AudioManager
 import android.media.ToneGenerator
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -61,6 +64,7 @@ import com.dmeltz.personalworkout.core.Mascot
 import com.dmeltz.personalworkout.core.Measure
 import com.dmeltz.personalworkout.core.Mood
 import com.dmeltz.personalworkout.core.Progression
+import com.dmeltz.personalworkout.core.SessionBuilder
 import com.dmeltz.personalworkout.core.Sessions
 import com.dmeltz.personalworkout.core.WarmupMove
 import com.dmeltz.personalworkout.core.WorkoutRecord
@@ -178,6 +182,10 @@ fun SessionScreen(
     val planned = shown?.plannedCount ?: 0
     val position = shown?.doneCount ?: 0
 
+    // Each new exercise starts at the top of the screen, with its instructions.
+    val scroll = rememberScrollState()
+    LaunchedEffect(position, session?.warmupDone) { scroll.scrollTo(0) }
+
     Column(Modifier.fillMaxSize().padding(top = 32.dp)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onQuit) { Icon(Icons.Filled.Close, contentDescription = "Stop") }
@@ -203,13 +211,15 @@ fun SessionScreen(
             }) { Text(if (state.readAloud) "🔊" else "🔇", fontSize = 18.sp) }
         }
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+            Modifier.fillMaxSize().verticalScroll(scroll).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             when {
                 done -> DoneView(finished ?: session, state, library, ((endedAt ?: startedAt) - startedAt) / 1000, logged, ::correct, onFinished)
                 !session!!.warmupDone -> {
-                    TodaysMuscles(session.exerciseIds.mapNotNull { library.exercise(it) })
+                    val todays = session.exerciseIds.mapNotNull { library.exercise(it) }
+                    TodaysPlan(todays, library.warmup, state, day)
+                    TodaysMuscles(todays)
                     WarmupView(library.warmup, speak = { if (state.readAloud) speaker.say(it) }) { update(Sessions.warmupDone(state)) }
                 }
                 else -> {
@@ -221,6 +231,7 @@ fun SessionScreen(
                             ex, es, position, planned, history.filter { it.exerciseId == ex.id && it.day != day },
                             readAloud = state.readAloud,
                             speak = speaker::say,
+                            speaking = { speaker.speaking },
                         ) { sets, effort ->
                             speaker.stop()
                             log(ex, es, sets, effort)
@@ -244,13 +255,58 @@ private fun TodaysMuscles(exercises: List<Exercise>) {
                 LegendDot(PrimaryMuscle, "Main work")
                 LegendDot(SecondaryMuscle, "Also used")
             }
+        }
+    }
+}
+
+/** Before the warm-up: today's exercises in order, with about how long each one takes. */
+@Composable
+private fun TodaysPlan(exercises: List<Exercise>, warmup: List<WarmupMove>, state: AppState, day: Day) {
+    val rows = exercises.map { ex ->
+        val es = state.exerciseState(ex.id) ?: state.initialState(ex, day)
+        Triple(ex, es, SessionBuilder.seconds(ex, es))
+    }
+    val warmupSeconds = warmup.sumOf { it.seconds }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Today's plan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(
+                    "About ${aboutMinutes(warmupSeconds + rows.sumOf { it.third })}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Good,
+                )
+            }
+            PlanRow("Warm-up", "${warmup.size} moves", warmupSeconds)
+            rows.forEachIndexed { i, (ex, es, seconds) ->
+                PlanRow("${i + 1}. ${ex.variation(es.variation).name}", "${es.sets} × ${ex.amount(es.variation, es.target)}", seconds)
+            }
             Text(
-                exercises.joinToString(" · ") { it.title },
+                "Times include the rests between sets. Once the warm-up is done, the workout runs by itself.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
         }
     }
+}
+
+@Composable
+private fun PlanRow(name: String, detail: String, seconds: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.bodyLarge)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+        }
+        Text(aboutMinutes(seconds), style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Seconds as minutes, to the nearest half: "2½ min". */
+private fun aboutMinutes(seconds: Int): String {
+    val halves = ((seconds + 15) / 30).coerceAtLeast(1)
+    val whole = if (halves / 2 > 0) "${halves / 2}" else ""
+    return whole + (if (halves % 2 == 1) "½" else "") + " min"
 }
 
 /** The muscles one exercise works, as a small body map and a line of text. */
@@ -324,6 +380,8 @@ private fun ExerciseView(
     previous: List<WorkoutRecord>,
     readAloud: Boolean,
     speak: (String) -> Unit,
+    /** Whether the instructions are still being read. */
+    speaking: () -> Boolean,
     onLog: (List<Int>, Effort) -> Unit,
 ) {
     val v = ex.variation(es.variation)
@@ -332,6 +390,17 @@ private fun ExerciseView(
     val spoken = remember(ex.id, es.variation) { instructions(ex, es, previous.none { it.variationIndex == es.variation }) }
     LaunchedEffect(ex.id, es.variation) { if (readAloud) speak(spoken) }
     val sets = remember(ex.id) { mutableStateListOf<Int>().apply { repeat(es.sets) { add(es.target) } } }
+    // The exercise runs by itself: time to read the instructions, then each set and rest in turn,
+    // then how it felt. Even steps are sets, odd ones the rests between them.
+    var step by remember(ex.id) { mutableIntStateOf(INTRO) }
+    val feelStep = 2 * es.sets - 1
+    LaunchedEffect(step) {
+        if (!readAloud) return@LaunchedEffect
+        when {
+            step == feelStep -> speak("How did it feel?")
+            step >= 0 && step % 2 == 0 -> speak("Set ${step / 2 + 1}. Go.")
+        }
+    }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -354,6 +423,7 @@ private fun ExerciseView(
     if (es.times == 0) PipSays(Mood.CALM, Mascot.newExercise(), size = 48.dp)
     Text(v.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
     if (v.name != ex.title) Text(ex.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.outline)
+    if (step == INTRO) IntroCountdown(speaking) { step = 0 }
     ex.figureAt(es.variation).let { name -> key(name) { FigureViews(name, 190.dp) } }
     Text(v.how, style = MaterialTheme.typography.bodyLarge)
     TextButton(onClick = { speak(spoken) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
@@ -403,16 +473,34 @@ private fun ExerciseView(
 
     LastTime(ex, es, previous)
     Text(
-        if (ex.measure == Measure.REPS) "Sets: adjust each to what you did" else "Sets: set the time, then tap Start",
+        if (ex.measure == Measure.REPS) "Sets: tap Done after each one" else "Sets: each hold starts by itself",
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
     )
+    Text(
+        if (ex.measure == Measure.REPS) "Change a number if you did more or fewer reps." else "Stop a hold early if your form breaks; what you held is logged.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.outline,
+    )
     sets.forEachIndexed { i, value ->
-        if (i > 0) RestRow(ex.rest)
-        SetRow(i + 1, value, ex.measure, step = if (ex.measure == Measure.REPS) 1 else 5, perSide = ex.perSide(es.variation), onChange = { sets[i] = it })
+        if (i > 0) RestRow(ex.rest, active = step == 2 * i - 1) { step = 2 * i }
+        SetRow(
+            i + 1, value, ex.measure,
+            step = if (ex.measure == Measure.REPS) 1 else 5,
+            perSide = ex.perSide(es.variation),
+            active = step == 2 * i,
+            onStart = { step = 2 * i },
+            onEnd = { step = 2 * i + 1 },
+            onChange = { sets[i] = it },
+        )
     }
-    Text("How did it feel?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Text(
+        "How did it feel?",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = if (step == feelStep) Good else MaterialTheme.colorScheme.onSurface,
+    )
+    Row(Modifier.fillMaxWidth().showWhen(step == feelStep), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         EffortButton("Easy", Good, Modifier.weight(1f)) { onLog(sets.toList(), Effort.EASY) }
         EffortButton("OK", Brand, Modifier.weight(1f)) { onLog(sets.toList(), Effort.OK) }
         EffortButton("Hard", Color(0xFFFFB066), Modifier.weight(1f)) { onLog(sets.toList(), Effort.HARD) }
@@ -428,14 +516,69 @@ private fun ExerciseView(
     Spacer(Modifier.height(24.dp))
 }
 
-/** One set: a stepper for reps, or for seconds with a countdown that beeps 2 and 1 seconds before the end and at the end. */
+/** Seconds to read the instructions before the first set. */
+private const val INTRO_SECONDS = 10
+private const val INTRO = -1
+
+/**
+ * About 10 seconds to read the instructions, then the first set starts. If they are still being
+ * read aloud, it waits for them to finish, for up to half a minute more.
+ */
 @Composable
-private fun SetRow(number: Int, value: Int, measure: Measure, step: Int, perSide: Boolean, onChange: (Int) -> Unit) {
-    var running by remember { mutableStateOf(false) }
+private fun IntroCountdown(speaking: () -> Boolean, onDoneClick: () -> Unit) {
+    val onDone by rememberUpdatedState(onDoneClick)
+    var left by remember { mutableIntStateOf(INTRO_SECONDS) }
+    var waiting by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        while (left > 0) { delay(1000); left-- }
+        waiting = true
+        var waited = 0
+        while (speaking() && waited < 60) { delay(500); waited++ }
+        beep()
+        onDone()
+    }
+    StepCard(highlight = true) {
+        Text(
+            if (waiting) "Finishing the instructions…" else "Read the instructions. Starting in $left s",
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+        )
+        TextButton(onClick = { onDone() }) { Text("Start now") }
+    }
+}
+
+/** Scrolls this into view when [active] turns true. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Modifier.showWhen(active: Boolean): Modifier {
+    val requester = remember { BringIntoViewRequester() }
+    LaunchedEffect(active) { if (active) requester.bringIntoView() }
+    return bringIntoViewRequester(requester)
+}
+
+/**
+ * One set: a stepper for reps, or for seconds with a countdown that beeps 2 and 1 seconds before the
+ * end and at the end. While [active], a hold counts down by itself and a set of reps waits for Done;
+ * either way [onEnd] moves on.
+ */
+@Composable
+private fun SetRow(
+    number: Int,
+    value: Int,
+    measure: Measure,
+    step: Int,
+    perSide: Boolean,
+    active: Boolean,
+    onStart: () -> Unit,
+    onEnd: () -> Unit,
+    onChange: (Int) -> Unit,
+) {
+    val running = active && measure == Measure.SECONDS
     var left by remember { mutableIntStateOf(0) }
     // For a timed hold on each side: 1 while on the first side, 2 on the second.
     var side by remember { mutableIntStateOf(1) }
     val change by rememberUpdatedState(onChange)
+    val end by rememberUpdatedState(onEnd)
     LaunchedEffect(running) {
         if (!running) return@LaunchedEffect
         val sides = if (perSide) 2 else 1
@@ -456,9 +599,9 @@ private fun SetRow(number: Int, value: Int, measure: Measure, step: Int, perSide
             }
         }
         side = 1
-        running = false
+        end()
     }
-    StepCard(highlight = running) {
+    StepCard(highlight = active, modifier = Modifier.showWhen(active)) {
         Column(Modifier.width(64.dp)) {
             Text("Set $number", style = MaterialTheme.typography.bodyLarge)
             if (perSide) {
@@ -483,24 +626,27 @@ private fun SetRow(number: Int, value: Int, measure: Measure, step: Int, perSide
             modifier = Modifier.width(76.dp),
         )
         FilledTonalButton(onClick = { onChange(value + step) }, enabled = !running) { Text("+") }
+        Spacer(Modifier.weight(1f))
         if (measure == Measure.SECONDS) {
-            Spacer(Modifier.weight(1f))
             TextButton(onClick = {
                 if (running) {
                     // Stopped early: log what was held (the full time if it stopped while switching sides).
                     change(if (side == 0) value else value - left)
-                    running = false
                     side = 1
-                } else running = true
+                    onEnd()
+                } else onStart()
             }) { Text(if (running) "Stop" else "Start") }
+        } else if (active) {
+            Button(onClick = onEnd, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) { Text("Done") }
         }
     }
 }
 
-/** The rest between two sets, shown like a set, with the same countdown beeps. */
+/** The rest between two sets, shown like a set, with the same countdown beeps. It runs while [active]. */
 @Composable
-private fun RestRow(seconds: Int) {
-    var running by remember { mutableStateOf(false) }
+private fun RestRow(seconds: Int, active: Boolean, onEnd: () -> Unit) {
+    val running = active
+    val end by rememberUpdatedState(onEnd)
     var left by remember { mutableIntStateOf(seconds) }
     LaunchedEffect(running) {
         if (!running) return@LaunchedEffect
@@ -511,9 +657,9 @@ private fun RestRow(seconds: Int) {
             if (left in 1..2) beep(short = true)
         }
         beep(short = false)
-        running = false
+        end()
     }
-    StepCard(highlight = running, rest = true) {
+    StepCard(highlight = running, rest = true, modifier = Modifier.showWhen(active)) {
         Text("Rest", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(56.dp))
         Text(
             "${if (running) left else seconds} s",
@@ -523,14 +669,19 @@ private fun RestRow(seconds: Int) {
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.Center,
         )
-        TextButton(onClick = { running = !running; if (!running) left = seconds }) { Text(if (running) "Skip" else "Start") }
+        if (running) TextButton(onClick = onEnd) { Text("Skip") } else Spacer(Modifier.width(64.dp))
     }
 }
 
 @Composable
-private fun StepCard(highlight: Boolean, rest: Boolean = false, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+private fun StepCard(
+    highlight: Boolean,
+    rest: Boolean = false,
+    modifier: Modifier = Modifier,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+) {
     Card(
-        Modifier.fillMaxWidth(),
+        modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = when {
                 highlight -> Good.copy(alpha = 0.18f)
