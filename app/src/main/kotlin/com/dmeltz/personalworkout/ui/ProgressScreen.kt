@@ -245,7 +245,7 @@ private fun ExerciseRow(ex: Exercise, state: AppState, onClick: () -> Unit) {
             Text(
                 if (s == null) "Not started yet"
                 else "${s.variation + 1}/${ex.variations.size} ${ex.variation(s.variation).name} · " +
-                    "${s.sets} × ${s.target} ${ex.unit}${if (ex.perSide) " per side" else ""} " +
+                    "${s.sets} × ${ex.amount(s.variation, s.target)} " +
                     "(range ${ex.variation(s.variation).min}–${ex.variation(s.variation).max})",
                 style = MaterialTheme.typography.bodySmall,
             )

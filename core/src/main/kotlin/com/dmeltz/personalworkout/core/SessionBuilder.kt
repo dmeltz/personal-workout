@@ -44,7 +44,7 @@ object SessionBuilder {
 
     /** Estimated seconds for an exercise at its current target, including rest between sets. */
     fun seconds(ex: Exercise, s: ExerciseState): Int {
-        val perSet = (if (ex.measure == Measure.REPS) s.target * 3 else s.target) * (if (ex.perSide) 2 else 1) + 5
+        val perSet = (if (ex.measure == Measure.REPS) s.target * 3 else s.target) * (if (ex.perSide(s.variation)) 2 else 1) + 5
         return s.sets * perSet + (s.sets - 1) * ex.rest + 30
     }
 

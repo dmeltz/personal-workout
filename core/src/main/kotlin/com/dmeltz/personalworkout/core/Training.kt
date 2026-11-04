@@ -53,6 +53,8 @@ data class AppState(
     /** "Not now" on the weigh-in card hides it until the next day. */
     val weighInSnoozedOn: Day = -1,
     val activeSession: ActiveSession? = null,
+    /** Data format version; see [Migrations]. A state saved before versions existed reads as 0. */
+    val version: Int = 0,
 ) {
     fun exerciseState(id: String): ExerciseState? = exercises[id]
 
@@ -120,6 +122,24 @@ data class WorkoutRecord(
 )
 
 const val WEIGH_IN_DAYS = 7
+
+/** Updates a saved state to the current exercise library. */
+object Migrations {
+    const val CURRENT = 1
+
+    fun run(library: Library, state: AppState): AppState {
+        var s = state
+        if (s.version < 1) {
+            // Version 1: alternating moves (dead bug, bird dog, archer push-up, Cossack squat) count per
+            // side instead of both sides together, so their targets halve.
+            s = s.copy(exercises = s.exercises.mapValues { (id, es) ->
+                val ex = library.exercise(id)
+                if (ex != null && ex.sidesAt(es.variation) == Sides.ALTERNATE) es.copy(target = (es.target + 1) / 2) else es
+            })
+        }
+        return s.copy(version = CURRENT)
+    }
+}
 
 object Body {
     /** Records a weigh-in, replacing any earlier one on the same day. */

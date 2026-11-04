@@ -125,7 +125,7 @@ fun SessionScreen(
                 variationIndex = before.variation,
                 variation = ex.variation(before.variation).name,
                 measure = ex.measure,
-                perSide = ex.perSide,
+                perSide = ex.perSide(before.variation),
                 target = before.target,
                 setsPlanned = before.sets,
                 done = sets,
@@ -293,7 +293,6 @@ private fun ExerciseView(
 ) {
     val v = ex.variation(es.variation)
     val sets = remember(ex.id) { mutableStateListOf<Int>().apply { repeat(es.sets) { add(es.target) } } }
-    val side = if (ex.perSide) " per side" else ""
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -332,7 +331,7 @@ private fun ExerciseView(
     ) {
         Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                "${es.sets} sets × ${es.target} ${ex.unit}$side",
+                "${es.sets} sets × ${ex.amount(es.variation, es.target)}",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -347,6 +346,16 @@ private fun ExerciseView(
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
+            ex.sidesHow(es.variation, es.target)?.let {
+                Text(
+                    "Both sides: $it Log the number per side.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
         }
     }
 
@@ -358,7 +367,7 @@ private fun ExerciseView(
     )
     sets.forEachIndexed { i, value ->
         if (i > 0) RestRow(ex.rest)
-        SetRow(i + 1, value, ex.measure, step = if (ex.measure == Measure.REPS) 1 else 5, onChange = { sets[i] = it })
+        SetRow(i + 1, value, ex.measure, step = if (ex.measure == Measure.REPS) 1 else 5, perSide = ex.perSide(es.variation), onChange = { sets[i] = it })
     }
     Text("How did it feel?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -379,23 +388,49 @@ private fun ExerciseView(
 
 /** One set: a stepper for reps, or for seconds with a countdown that beeps 2 and 1 seconds before the end and at the end. */
 @Composable
-private fun SetRow(number: Int, value: Int, measure: Measure, step: Int, onChange: (Int) -> Unit) {
+private fun SetRow(number: Int, value: Int, measure: Measure, step: Int, perSide: Boolean, onChange: (Int) -> Unit) {
     var running by remember { mutableStateOf(false) }
     var left by remember { mutableIntStateOf(0) }
+    // For a timed hold on each side: 1 while on the first side, 2 on the second.
+    var side by remember { mutableIntStateOf(1) }
     val change by rememberUpdatedState(onChange)
     LaunchedEffect(running) {
         if (!running) return@LaunchedEffect
-        left = value
-        while (left > 0) {
-            delay(1000)
-            left--
-            if (left in 1..2) beep(short = true)
+        val sides = if (perSide) 2 else 1
+        for (s in 1..sides) {
+            side = s
+            left = value
+            while (left > 0) {
+                delay(1000)
+                left--
+                if (left in 1..2) beep(short = true)
+            }
+            beep(short = false)
+            if (s < sides) {
+                // A few seconds to switch sides before the second hold.
+                left = 5
+                side = 0
+                while (left > 0) { delay(1000); left-- }
+            }
         }
-        beep(short = false)
+        side = 1
         running = false
     }
     StepCard(highlight = running) {
-        Text("Set $number", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(56.dp))
+        Column(Modifier.width(64.dp)) {
+            Text("Set $number", style = MaterialTheme.typography.bodyLarge)
+            if (perSide) {
+                Text(
+                    when {
+                        !running -> "per side"
+                        side == 0 -> "switch!"
+                        else -> "side $side of 2"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (running) Good else MaterialTheme.colorScheme.outline,
+                )
+            }
+        }
         FilledTonalButton(onClick = { onChange((value - step).coerceAtLeast(0)) }, enabled = !running) { Text("−") }
         Text(
             if (running) "$left s" else if (measure == Measure.REPS) "$value" else "$value s",
@@ -410,9 +445,10 @@ private fun SetRow(number: Int, value: Int, measure: Measure, step: Int, onChang
             Spacer(Modifier.weight(1f))
             TextButton(onClick = {
                 if (running) {
-                    // Stopped early: log what was held.
-                    change(value - left)
+                    // Stopped early: log what was held (the full time if it stopped while switching sides).
+                    change(if (side == 0) value else value - left)
                     running = false
+                    side = 1
                 } else running = true
             }) { Text(if (running) "Stop" else "Start") }
         }
@@ -478,14 +514,14 @@ private fun LastTime(ex: Exercise, es: ExerciseState, previous: List<WorkoutReco
                 Row {
                     Text(
                         java.time.LocalDate.ofEpochDay(r.day).format(format) + " · " + r.variation + ": " +
-                            if (r.effort == Effort.SKIPPED) "skipped" else r.done.joinToString(" / ") + " " + ex.unit,
+                            if (r.effort == Effort.SKIPPED) "skipped" else r.done.joinToString(" / ") + " " + ex.unit + if (r.perSide) " per side" else "",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
                     Text(effortLabel(r.effort), color = effortColor(r.effort), style = MaterialTheme.typography.bodyMedium)
                 }
             }
-            val now = "${es.sets} × ${es.target} ${ex.unit}"
+            val now = "${es.sets} × ${ex.amount(es.variation, es.target)}"
             val why = when {
                 es.variation > last.variationIndex -> "You topped the range last time, so today moves up to ${ex.variation(es.variation).name}."
                 es.variation < last.variationIndex -> "Last time was too much, so today steps back to ${ex.variation(es.variation).name}."

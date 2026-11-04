@@ -6,6 +6,7 @@ import com.dmeltz.personalworkout.core.Day
 import com.dmeltz.personalworkout.core.Group
 import com.dmeltz.personalworkout.core.Library
 import com.dmeltz.personalworkout.core.LibraryParser
+import com.dmeltz.personalworkout.core.Migrations
 import com.dmeltz.personalworkout.core.Progression
 import com.dmeltz.personalworkout.core.WorkoutRecord
 import kotlinx.serialization.Serializable
@@ -33,11 +34,12 @@ class Repository private constructor(private val context: Context) {
         private set
 
     private fun load(): AppState = try {
-        if (stateFile.exists()) json.decodeFromString<AppState>(stateFile.readText()) else AppState()
+        if (stateFile.exists()) Migrations.run(library, json.decodeFromString<AppState>(stateFile.readText()))
+        else AppState(version = Migrations.CURRENT)
     } catch (e: Exception) {
         // Keep the unreadable file for inspection instead of overwriting it.
         stateFile.copyTo(File(context.filesDir, "state-broken-${System.currentTimeMillis()}.json"), overwrite = true)
-        AppState()
+        AppState(version = Migrations.CURRENT)
     }
 
     @Synchronized

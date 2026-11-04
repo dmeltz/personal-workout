@@ -208,3 +208,41 @@ class MuscleTest {
         kotlin.test.assertEquals(false, m[Muscle.OBLIQUES])
     }
 }
+
+class SidesTest {
+    private val lib = LibraryParser.parse(java.io.File("../app/src/main/assets/exercises.txt").readText())
+
+    @Test
+    fun sidesAreExplicit() {
+        val bug = lib.exercise("DEAD_BUG")!!
+        assertEquals(Sides.ALTERNATE, bug.sidesAt(0))
+        assertEquals("4 reps per side", bug.amount(0, 4))
+        kotlin.test.assertTrue("8 reps in total" in bug.sidesHow(0, 4)!!)
+        val push = lib.exercise("PUSHUP")!!
+        assertEquals(Sides.NONE, push.sidesAt(1))
+        assertEquals(Sides.ALTERNATE, push.sidesAt(push.variations.indexOfFirst { it.name.startsWith("Archer") }))
+        kotlin.test.assertNull(push.sidesHow(1, 10))
+        assertEquals(Sides.NONE, lib.exercise("BIRD_DOG")!!.sidesAt(2), "superman lifts both sides at once")
+        assertEquals(Sides.EACH, lib.exercise("SIDE_PLANK")!!.sidesAt(0))
+        // No variation text still says how to count sides: the app explains it from the sides field.
+        for (e in lib.exercises) for (v in e.variations) {
+            kotlin.test.assertFalse("count each" in v.how.lowercase(), "${e.id} ${v.name}")
+            kotlin.test.assertFalse("each side is one rep" in (e.cues + v.cues).joinToString().lowercase(), e.id)
+        }
+    }
+
+    @Test
+    fun oldAlternatingTargetsHalve() {
+        val bug = lib.exercise("DEAD_BUG")!!
+        val old = AppState(exercises = mapOf(
+            "DEAD_BUG" to ExerciseState(variation = 0, target = 11, sets = 2, introducedOn = 1),
+            "SQUAT" to ExerciseState(variation = 1, target = 14, sets = 2, introducedOn = 1),
+        ))
+        val new = Migrations.run(lib, old)
+        assertEquals(6, new.exerciseState("DEAD_BUG")!!.target)
+        assertEquals(14, new.exerciseState("SQUAT")!!.target)
+        assertEquals(Migrations.CURRENT, new.version)
+        assertEquals(new, Migrations.run(lib, new), "running it again changes nothing")
+        kotlin.test.assertTrue(bug.variations.all { it.min >= 3 })
+    }
+}
