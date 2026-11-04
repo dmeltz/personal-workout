@@ -87,7 +87,13 @@ class CoreTest {
         val next = Progression.apply(calf, s, listOf(s.target, s.target), Effort.EASY, monday)
         assertEquals(top, next.variation)
         assertEquals(3, next.sets)
-        assertTrue(Progression.level(calf, next) > Progression.level(calf, s))
+        // Adding the set at the top of the ladder keeps the level where it was: no jump.
+        assertEquals(Progression.level(calf, s), Progression.level(calf, next), 0.06)
+        // Falling below the range with the extra set drops it again, at mid-range: no jump either way.
+        val low = next.copy(target = calf.variation(top).min)
+        val dropped = Progression.apply(calf, low, listOf(1, 1), Effort.HARD, monday)
+        assertEquals(calf.sets, dropped.sets)
+        assertEquals(Progression.level(calf, low), Progression.level(calf, dropped), 0.06)
     }
 
     @Test fun levelGrowsWithProgress() {
@@ -96,6 +102,9 @@ class CoreTest {
         assertEquals(2.0, Progression.level(pushup, a))
         assertEquals(2.5, Progression.level(pushup, a.copy(target = (6 + 15) / 2 + 1)), 0.1)
         assertEquals(3.0, Progression.level(pushup, a.copy(variation = 2, target = pushup.variation(2).min)))
+        // A set more or fewer is half a level either way.
+        assertEquals(2.5, Progression.level(pushup, a.copy(sets = pushup.sets + 1)), 1e-9)
+        assertEquals(1.5, Progression.level(pushup, a.copy(sets = pushup.sets - 1)), 1e-9)
     }
 
     @Test fun restDaysDontBreakTheStreak() {

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dmeltz.personalworkout.core.Exercise
 import com.dmeltz.personalworkout.core.ExerciseState
+import com.dmeltz.personalworkout.core.Progression
 
 /** How far the target is through the current variation's range, 0 to 1. */
 fun rangeFraction(ex: Exercise, s: ExerciseState): Float {
@@ -84,12 +85,16 @@ fun LadderDetail(ex: Exercise, s: ExerciseState?) {
                 "Target ${ex.amount(s.variation, s.target)}, in a range of ${v.min}–${v.max} " +
                     "(${(rangeFraction(ex, s) * 100).toInt()}% of the way). " +
                     if (s.variation < ex.variations.lastIndex) "Past ${v.max} you move to variation ${s.variation + 2}."
-                    else "Past ${v.max} you add a set.",
+                    else if (s.sets < Progression.MAX_SETS) "Past ${v.max} the app adds a set for you, and the target goes back to mid-range."
+                    else "This is the top of the ladder: the target keeps rising past ${v.max}.",
                 style = MaterialTheme.typography.bodySmall,
             )
-            if (s.sets > ex.sets) {
-                Text("+${s.sets - ex.sets} extra set, earned at the top of the ladder.", style = MaterialTheme.typography.bodySmall)
-            }
+            Text(
+                "Sets: ${s.sets} (usually ${ex.sets}). The app changes them, you don't need to: it adds one when you top " +
+                    "the hardest variation and takes it away if that gets too hard. Each set more or fewer than usual " +
+                    "counts half a level.",
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
     }
 }

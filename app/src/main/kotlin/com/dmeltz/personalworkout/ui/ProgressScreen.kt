@@ -103,7 +103,7 @@ fun ProgressScreen(
                         )
                         Text(
                             "$started of ${library.exercises.size} exercises started. Each exercise's level is its " +
-                                "variation (1 = easiest) plus how far you are through that variation's range.",
+                                "variation (1 = easiest) plus how far you are through that variation's range, ±0.5 per set above or below the usual.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         val series = buildList {

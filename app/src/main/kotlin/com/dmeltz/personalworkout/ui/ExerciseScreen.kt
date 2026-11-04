@@ -89,7 +89,7 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
             LevelChart(listOf(LineSeries(exercise.title, color, byDay)), Modifier.fillMaxWidth().height(180.dp))
             Text(
                 "The level is the variation number plus how far you are through its range, so it climbs " +
-                    "steadily even when you move to a harder variation.",
+                    "steadily even when you move to a harder variation. Each set more or fewer than usual adds or takes off half a level.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )

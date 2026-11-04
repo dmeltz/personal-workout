@@ -211,6 +211,8 @@ object Levels {
 
 object Progression {
     const val MAX_SETS = 3
+    /** Level per set above or below an exercise's usual number of sets. */
+    const val SET_WEIGHT = 0.5
 
     fun small(ex: Exercise) = if (ex.measure == Measure.REPS) 1 else 5
     fun big(ex: Exercise) = if (ex.measure == Measure.REPS) 2 else 10
@@ -225,9 +227,10 @@ object Progression {
     fun level(ex: Exercise, s: ExerciseState): Double {
         val v = ex.variation(s.variation)
         val within = ((s.target - v.min).toDouble() / (v.max - v.min)).coerceIn(0.0, 1.0)
-        // A third set, once the ladder is at its top, counts as extra capacity.
-        val extraSets = (s.sets - ex.sets).coerceAtLeast(0) * 1.0
-        return s.variation + 1 + within + extraSets
+        // Each set above or below the exercise's usual number counts half a level either way. Half,
+        // because a set is added at mid-range: topping the range (+1 through it) and the new set at
+        // mid-range (+0.5 within, +0.5 for the set) are the same level, so the line doesn't jump.
+        return s.variation + 1 + within + SET_WEIGHT * (s.sets - ex.sets)
     }
 
     /**
@@ -260,7 +263,8 @@ object Progression {
             }
         } else if (target < v.min) {
             when {
-                sets > ex.sets -> { sets--; target = v.max }
+                // Back to the usual sets at mid-range: the same level as the extra set at the bottom.
+                sets > ex.sets -> { sets--; target = v.min + (v.max - v.min) / 2 }
                 variation > 0 && (effort == Effort.SKIPPED || achieved < v.min) -> {
                     variation--
                     val prev = ex.variation(variation)
