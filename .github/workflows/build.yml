@@ -1,0 +1,48 @@
+name: Build app
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Test practice logic and curriculum
+        run: ./gradlew :core:test
+
+      - name: Build APK
+        run: ./gradlew :app:assembleDebug
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk personal-workout.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: personal-workout-apk
+          path: personal-workout.apk
+
+      # Each build on main becomes a release, so the newest APK is always at /releases/latest.
+      - name: Publish release
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          body: Install personal-workout.apk on your phone. It updates the existing app and keeps your progress.
+          files: personal-workout.apk
+          make_latest: true
