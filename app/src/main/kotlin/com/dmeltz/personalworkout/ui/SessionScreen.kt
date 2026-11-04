@@ -170,7 +170,10 @@ fun SessionScreen(
         ) {
             when {
                 done -> DoneView(finished ?: session, state, library, onFinished)
-                !session!!.warmupDone -> WarmupView(library.warmup) { update(Sessions.warmupDone(state)) }
+                !session!!.warmupDone -> {
+                    TodaysMuscles(session.exerciseIds.mapNotNull { library.exercise(it) })
+                    WarmupView(library.warmup) { update(Sessions.warmupDone(state)) }
+                }
                 else -> {
                     val ex = exercise!!
                     val es = state.exerciseState(ex.id) ?: Progression.initial(ex, day)
@@ -182,6 +185,38 @@ fun SessionScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Before the warm-up: the muscles today's session will work, on a body map. */
+@Composable
+private fun TodaysMuscles(exercises: List<Exercise>) {
+    val muscles = Progression.musclesOf(exercises)
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Today's muscles", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            BodyMap(highlight(muscles), height = 170.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                LegendDot(PrimaryMuscle, "Main work")
+                LegendDot(SecondaryMuscle, "Also used")
+            }
+            Text(
+                exercises.joinToString(" · ") { it.title },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
+    }
+}
+
+/** The muscles one exercise works, as a small body map and a line of text. */
+@Composable
+fun ExerciseMuscles(ex: Exercise) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            BodyMap(highlight(Progression.musclesOf(listOf(ex))), height = 120.dp)
+            Text(musclesText(ex.primary, ex.secondary), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -272,6 +307,7 @@ private fun ExerciseView(
     if (v.name != ex.title) Text(ex.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.outline)
     FigureViews(ex.figure, 190.dp)
     Text(v.how, style = MaterialTheme.typography.bodyLarge)
+    ExerciseMuscles(ex)
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Form", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)

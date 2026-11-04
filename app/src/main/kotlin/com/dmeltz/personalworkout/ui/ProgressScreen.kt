@@ -1,7 +1,9 @@
 package com.dmeltz.personalworkout.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +44,7 @@ import com.dmeltz.personalworkout.core.Group
 import com.dmeltz.personalworkout.core.Library
 import com.dmeltz.personalworkout.core.Mascot
 import com.dmeltz.personalworkout.core.Mood
+import com.dmeltz.personalworkout.core.Muscle
 import com.dmeltz.personalworkout.core.Progression
 import com.dmeltz.personalworkout.today
 import java.time.LocalDate
@@ -107,6 +110,7 @@ fun ProgressScreen(
                     }
                 }
             }
+            item { MuscleStatus(state, library, day) }
             item {
                 Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -151,6 +155,68 @@ fun ProgressScreen(
                 items(exercises, key = { it.id }) { ex ->
                     ExerciseRow(ex, state) { onExercise(ex.id) }
                     HorizontalDivider()
+                }
+            }
+        }
+    }
+}
+
+private val MuscleLow = Color(0xFF2E6B57)
+private val MuscleHigh = Color(0xFF8CF5B8)
+
+private fun lerp(a: Color, b: Color, t: Float) = Color(
+    a.red + (b.red - a.red) * t, a.green + (b.green - a.green) * t, a.blue + (b.blue - a.blue) * t, 1f,
+)
+
+/** The whole body, each muscle colored by its level: brighter is stronger, grey is not started yet. */
+@Composable
+private fun MuscleStatus(state: AppState, library: Library, day: Day) {
+    val levels = Muscle.entries.associateWith { Progression.muscleLevel(library, state, it) }
+    val known = levels.values.filterNotNull()
+    val lo = known.minOrNull() ?: 0.0
+    val hi = known.maxOrNull() ?: 0.0
+    fun colorOf(level: Double) = lerp(MuscleLow, MuscleHigh, if (hi > lo) ((level - lo) / (hi - lo)).toFloat() else 0.6f)
+    val colors = levels.mapNotNull { (m, l) -> l?.let { m to colorOf(it) } }.toMap()
+    Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Body map", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "Each muscle's level is the average of the started exercises that mainly work it. " +
+                    "Brighter is further along; grey is not started yet.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            BodyMap(colors, Modifier.padding(vertical = 6.dp), height = 200.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                LegendDot(MuscleLow, "Lowest")
+                LegendDot(MuscleHigh, "Highest")
+                LegendDot(Color(0xFF55617A), "Not started")
+            }
+            HorizontalDivider(Modifier.padding(vertical = 6.dp))
+            for (m in Muscle.entries) {
+                val level = levels[m]
+                val last = Progression.muscleLastWorked(library, state, m)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.width(10.dp).height(10.dp).background(colors[m] ?: Color(0xFF55617A), CircleShape))
+                    Text(m.label, Modifier.padding(start = 8.dp).weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        level?.let { "%.2f".format(it) } ?: "–",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(48.dp),
+                        textAlign = TextAlign.End,
+                    )
+                    Text(
+                        when (val d = last?.let { day - it }) {
+                            null -> "never"
+                            0L -> "today"
+                            1L -> "yesterday"
+                            else -> "$d days ago"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.width(92.dp),
+                        textAlign = TextAlign.End,
+                    )
                 }
             }
         }

@@ -11,6 +11,24 @@ enum class Group(val label: String, val short: String) {
 
 enum class Measure { REPS, SECONDS }
 
+/** Muscles shown on the body map. */
+enum class Muscle(val label: String) {
+    CHEST("Chest"),
+    SHOULDERS("Shoulders"),
+    BICEPS("Biceps"),
+    TRICEPS("Triceps"),
+    FOREARMS("Forearms and grip"),
+    ABS("Abs"),
+    OBLIQUES("Obliques"),
+    UPPER_BACK("Upper back"),
+    LATS("Lats"),
+    LOWER_BACK("Lower back"),
+    GLUTES("Glutes"),
+    QUADS("Quads"),
+    HAMSTRINGS("Hamstrings"),
+    CALVES("Calves"),
+}
+
 /** One step on an exercise's ladder, from easiest to hardest. [min]..[max] is the target range per set. */
 data class Variation(
     val name: String,
@@ -43,6 +61,10 @@ data class Exercise(
     val figure: String,
     val cues: List<String>,
     val variations: List<Variation>,
+    /** Muscles the exercise mainly works. */
+    val primary: List<Muscle> = emptyList(),
+    /** Muscles that help or stabilize. */
+    val secondary: List<Muscle> = emptyList(),
 ) {
     fun variation(index: Int): Variation = variations[index.coerceIn(0, variations.lastIndex)]
     val unit: String get() = if (measure == Measure.REPS) "reps" else "s"
@@ -110,6 +132,7 @@ class Figure(val start: Pose, val end: Pose, val props: List<Prop>) {
  * start: 1
  * intro: 1
  * figure: PUSHUP
+ * muscles: chest triceps shoulders | abs
  * cue: A cue for every variation.
  * variation: Incline push-up | 8-15 | Hands on a table or counter.
  * cue: A cue for this variation only.
@@ -124,6 +147,11 @@ class Figure(val start: Pose, val end: Pose, val props: List<Prop>) {
  * Optional lines: "per side: yes", "equipment: pull-up bar". Lines starting with "//" and blank lines are ignored.
  */
 object LibraryParser {
+    private fun muscles(id: String, text: String): List<Muscle> =
+        text.split(" ", ",").map { it.trim() }.filter { it.isNotEmpty() }.map { name ->
+            Muscle.entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: error("Exercise $id: unknown muscle $name")
+        }
+
     fun parse(text: String): Library {
         val exercises = mutableListOf<Exercise>()
         val warmup = mutableListOf<WarmupMove>()
@@ -167,6 +195,8 @@ object LibraryParser {
                 figure = need("figure"),
                 cues = cues.toList(),
                 variations = variations.toList(),
+                primary = muscles(exId, need("muscles").substringBefore("|")),
+                secondary = muscles(exId, need("muscles").substringAfter("|", "")),
             )
             require(ex.variations.isNotEmpty()) { "Exercise $exId has no variations" }
             require(ex.start in ex.variations.indices) { "Exercise $exId: start is past the last variation" }
@@ -201,7 +231,7 @@ object LibraryParser {
                 line.startsWith("cue:") -> (if (inVariation) varCues else cues) += line.substringAfter(":").trim()
                 line.contains(":") -> {
                     val key = line.substringBefore(":").trim()
-                    if (key !in setOf("title", "group", "measure", "per side", "sets", "rest", "start", "intro", "equipment", "figure")) {
+                    if (key !in setOf("title", "group", "measure", "per side", "sets", "rest", "start", "intro", "equipment", "figure", "muscles")) {
                         fail("unknown field")
                     }
                     fields[key] = line.substringAfter(":").trim()
