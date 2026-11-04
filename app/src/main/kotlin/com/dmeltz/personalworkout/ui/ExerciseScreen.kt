@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.dmeltz.personalworkout.core.AppState
 import com.dmeltz.personalworkout.core.Effort
 import com.dmeltz.personalworkout.core.Exercise
+import com.dmeltz.personalworkout.core.Measure
 import com.dmeltz.personalworkout.core.Progression
 import com.dmeltz.personalworkout.core.WorkoutRecord
 import java.time.LocalDate
@@ -50,6 +51,9 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
             } else {
                 Text("Not started yet. It joins your plan in its turn.", style = MaterialTheme.typography.bodyMedium)
             }
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) { LadderDetail(exercise, s) }
+            }
 
             Text("Variations, easiest first", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Card(Modifier.fillMaxWidth()) {
@@ -74,6 +78,34 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
             Text("Level over time", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             val byDay = records.groupBy { it.day }.map { (d, rs) -> d to rs.last().levelAfter }.sortedBy { it.first }
             LevelChart(listOf(LineSeries(exercise.title, color, byDay)), Modifier.fillMaxWidth().height(180.dp))
+            Text(
+                "The level is the variation number plus how far you are through its range, so it climbs " +
+                    "steadily even when you move to a harder variation.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
+
+            Text(
+                if (exercise.measure == Measure.REPS) "Reps per set over time" else "Seconds per set over time",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            val logged = records.filter { it.effort != Effort.SKIPPED && it.done.isNotEmpty() }.groupBy { it.day }
+                .map { (d, rs) -> d to rs.last() }.sortedBy { it.first }
+            val target = LineSeries("Target", Color.White, logged.map { (d, r) -> d to r.target.toDouble() })
+            val done = LineSeries("Done (average)", color, logged.map { (d, r) -> d to r.done.average() })
+            LevelChart(listOf(target, done), Modifier.fillMaxWidth().height(180.dp))
+            Legend(listOf(target, done))
+            val changes = records.zipWithNext().filter { (a, b) -> b.variationIndex != a.variationIndex }
+            if (changes.isNotEmpty()) {
+                val format = DateTimeFormatter.ofPattern("d MMM")
+                Text(
+                    "Drops in the target are moves to a new variation: " +
+                        changes.joinToString("; ") { (_, b) -> "${LocalDate.ofEpochDay(b.day).format(format)} to ${b.variation}" } + ".",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
 
             if (records.isNotEmpty()) {
                 Text("Recent logs", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
