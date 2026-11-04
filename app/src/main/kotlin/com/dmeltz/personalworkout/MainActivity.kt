@@ -107,6 +107,7 @@ class MainActivity : ComponentActivity() {
                     is Screen.Session -> SessionScreen(
                         library = repo.library,
                         initialState = state,
+                        history = remember(screen) { repo.records() },
                         onState = ::update,
                         onRecord = repo::appendRecord,
                         onFinished = {

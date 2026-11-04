@@ -71,6 +71,8 @@ import kotlinx.coroutines.delay
 fun SessionScreen(
     library: Library,
     initialState: AppState,
+    /** Every logged exercise before this screen opened, for "last time". */
+    history: List<WorkoutRecord>,
     onState: (AppState) -> Unit,
     onRecord: (WorkoutRecord) -> Unit,
     onFinished: () -> Unit,
@@ -175,7 +177,9 @@ fun SessionScreen(
                     val es = state.exerciseState(ex.id) ?: Progression.initial(ex, day)
                     lastMessage?.let { PipSays(Mood.HAPPY, it, size = 48.dp) }
                     key(ex.id, position) {
-                        ExerciseView(ex, es, position, planned) { sets, effort, unclear -> log(ex, es, sets, effort, unclear) }
+                        ExerciseView(ex, es, position, planned, history.filter { it.exerciseId == ex.id && it.day != day }) { sets, effort, unclear ->
+                            log(ex, es, sets, effort, unclear)
+                        }
                     }
                 }
             }
@@ -191,7 +195,11 @@ private fun WarmupView(moves: List<WarmupMove>, onDoneClick: () -> Unit) {
     LaunchedEffect(index) {
         if (index !in moves.indices) return@LaunchedEffect
         left = moves[index].seconds
-        while (left > 0) { delay(1000); left-- }
+        while (left > 0) {
+            delay(1000)
+            left--
+            if (left in 1..2) beep(short = true)
+        }
         beep()
         if (index < moves.lastIndex) index++ else onDone()
     }
@@ -228,15 +236,12 @@ private fun ExerciseView(
     es: ExerciseState,
     position: Int,
     planned: Int,
+    previous: List<WorkoutRecord>,
     onLog: (List<Int>, Effort, Boolean) -> Unit,
 ) {
     val v = ex.variation(es.variation)
     val sets = remember(ex.id) { mutableStateListOf<Int>().apply { repeat(es.sets) { add(es.target) } } }
     var unclear by remember(ex.id) { mutableStateOf(false) }
-    var resting by remember(ex.id) { mutableIntStateOf(0) }
-    LaunchedEffect(resting > 0) {
-        while (resting > 0) { delay(1000); resting-- ; if (resting == 0) beep() }
-    }
     val side = if (ex.perSide) " per side" else ""
 
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -281,7 +286,11 @@ private fun ExerciseView(
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Text(
-                "Rest ${ex.rest} s between sets. Stop each set with a rep or two left in the tank.",
+                if (ex.measure == Measure.REPS) {
+                    "Rest ${ex.rest} s between sets. End each set when you could still do 1 or 2 more good reps, not at total failure."
+                } else {
+                    "Rest ${ex.rest} s between sets. Hold for the target time; stop early if your form breaks, and log what you held."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -289,14 +298,15 @@ private fun ExerciseView(
         }
     }
 
-    Text("What you did", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    LastTime(ex, es, previous)
+    Text(
+        if (ex.measure == Measure.REPS) "Sets: adjust each to what you did" else "Sets: set the time, then tap Start",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+    )
     sets.forEachIndexed { i, value ->
+        if (i > 0) RestRow(ex.rest)
         SetRow(i + 1, value, ex.measure, step = if (ex.measure == Measure.REPS) 1 else 5, onChange = { sets[i] = it })
-    }
-    if (resting > 0) {
-        Text("Rest: $resting s", fontSize = 22.sp, color = Good, fontWeight = FontWeight.Bold)
-    } else {
-        TextButton(onClick = { resting = ex.rest }) { Text("Start a ${ex.rest} s rest timer") }
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = unclear, onCheckedChange = { unclear = it })
@@ -319,34 +329,141 @@ private fun ExerciseView(
     Spacer(Modifier.height(24.dp))
 }
 
+/** One set: a stepper for reps, or for seconds with a countdown that beeps 2 and 1 seconds before the end and at the end. */
 @Composable
 private fun SetRow(number: Int, value: Int, measure: Measure, step: Int, onChange: (Int) -> Unit) {
-    var timing by remember { mutableStateOf(false) }
-    var elapsed by remember { mutableIntStateOf(0) }
-    LaunchedEffect(timing) {
-        if (!timing) return@LaunchedEffect
-        elapsed = 0
-        while (timing) { delay(1000); elapsed++ }
+    var running by remember { mutableStateOf(false) }
+    var left by remember { mutableIntStateOf(0) }
+    val change by rememberUpdatedState(onChange)
+    LaunchedEffect(running) {
+        if (!running) return@LaunchedEffect
+        left = value
+        while (left > 0) {
+            delay(1000)
+            left--
+            if (left in 1..2) beep(short = true)
+        }
+        beep(short = false)
+        running = false
     }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("Set $number", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(64.dp))
-        FilledTonalButton(onClick = { onChange((value - step).coerceAtLeast(0)) }, enabled = !timing) { Text("−") }
+    StepCard(highlight = running) {
+        Text("Set $number", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(56.dp))
+        FilledTonalButton(onClick = { onChange((value - step).coerceAtLeast(0)) }, enabled = !running) { Text("−") }
         Text(
-            if (timing) "$elapsed s" else if (measure == Measure.REPS) "$value" else "$value s",
+            if (running) "$left s" else if (measure == Measure.REPS) "$value" else "$value s",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            color = if (timing) Good else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.width(84.dp),
+            color = if (running) Good else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.width(76.dp),
         )
-        FilledTonalButton(onClick = { onChange(value + step) }, enabled = !timing) { Text("+") }
+        FilledTonalButton(onClick = { onChange(value + step) }, enabled = !running) { Text("+") }
         if (measure == Measure.SECONDS) {
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.weight(1f))
             TextButton(onClick = {
-                if (timing) { onChange(elapsed); timing = false } else timing = true
-            }) { Text(if (timing) "Stop" else "Time it") }
+                if (running) {
+                    // Stopped early: log what was held.
+                    change(value - left)
+                    running = false
+                } else running = true
+            }) { Text(if (running) "Stop" else "Start") }
         }
     }
+}
+
+/** The rest between two sets, shown like a set, with the same countdown beeps. */
+@Composable
+private fun RestRow(seconds: Int) {
+    var running by remember { mutableStateOf(false) }
+    var left by remember { mutableIntStateOf(seconds) }
+    LaunchedEffect(running) {
+        if (!running) return@LaunchedEffect
+        left = seconds
+        while (left > 0) {
+            delay(1000)
+            left--
+            if (left in 1..2) beep(short = true)
+        }
+        beep(short = false)
+        running = false
+    }
+    StepCard(highlight = running, rest = true) {
+        Text("Rest", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(56.dp))
+        Text(
+            "${if (running) left else seconds} s",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (running) Good else MaterialTheme.colorScheme.outline,
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center,
+        )
+        TextButton(onClick = { running = !running; if (!running) left = seconds }) { Text(if (running) "Skip" else "Start") }
+    }
+}
+
+@Composable
+private fun StepCard(highlight: Boolean, rest: Boolean = false, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                highlight -> Good.copy(alpha = 0.18f)
+                rest -> MaterialTheme.colorScheme.surfaceContainer
+                else -> MaterialTheme.colorScheme.surfaceContainerHigh
+            },
+        ),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, content = content)
+    }
+}
+
+/** What was done the last few times, and why today's target is what it is. */
+@Composable
+private fun LastTime(ex: Exercise, es: ExerciseState, previous: List<WorkoutRecord>) {
+    if (previous.isEmpty()) return
+    val format = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM")
+    val last = previous.last()
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Previous sessions", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            for (r in previous.takeLast(3).reversed()) {
+                Row {
+                    Text(
+                        java.time.LocalDate.ofEpochDay(r.day).format(format) + " · " + r.variation + ": " +
+                            if (r.effort == Effort.SKIPPED) "skipped" else r.done.joinToString(" / ") + " " + ex.unit,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(effortLabel(r.effort), color = effortColor(r.effort), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            val now = "${es.sets} × ${es.target} ${ex.unit}"
+            val why = when {
+                es.variation > last.variationIndex -> "You topped the range last time, so today moves up to ${ex.variation(es.variation).name}."
+                es.variation < last.variationIndex -> "Last time was too much, so today steps back to ${ex.variation(es.variation).name}."
+                es.sets > last.setsPlanned -> "You topped the hardest version, so today adds a set."
+                last.effort == Effort.EASY -> "It felt easy last time, so today's target goes up: $now."
+                last.effort == Effort.OK -> "It felt OK last time, so a small step up: $now."
+                last.effort == Effort.HARD -> "It felt hard last time, so the target holds or eases: $now."
+                else -> "You skipped it last time, so today is easier: $now."
+            }
+            Text(why, style = MaterialTheme.typography.bodyMedium, color = Brand)
+        }
+    }
+}
+
+private fun effortLabel(e: Effort) = when (e) {
+    Effort.EASY -> "Easy"
+    Effort.OK -> "OK"
+    Effort.HARD -> "Hard"
+    Effort.SKIPPED -> "Skipped"
+}
+
+private fun effortColor(e: Effort) = when (e) {
+    Effort.EASY -> Good
+    Effort.OK -> Brand
+    Effort.HARD -> Color(0xFFFFB066)
+    Effort.SKIPPED -> Bad
 }
 
 @Composable
@@ -376,10 +493,11 @@ private fun DoneView(session: ActiveSession?, state: AppState, library: Library,
     Button(onClick = onFinish, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Finish") }
 }
 
-private fun beep() {
+/** A short beep for "about to end", a longer one at the end. */
+private fun beep(short: Boolean = false) {
     runCatching {
-        val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
-        tone.startTone(ToneGenerator.TONE_PROP_BEEP2, 400)
+        val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 90)
+        tone.startTone(ToneGenerator.TONE_PROP_BEEP, if (short) 150 else 600)
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ tone.release() }, 800)
     }
 }
