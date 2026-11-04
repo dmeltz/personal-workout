@@ -54,7 +54,7 @@ sets: 2
 rest: 60
 start: 1
 intro: 4
-figure: PUSHUP
+figure: CLOSE_PUSHUP
 muscles: triceps chest | shoulders abs
 cue: Hands shoulder-width or a little closer, directly under your shoulders.
 cue: Elbows brush your ribs on the way down. This moves the work to the triceps.
@@ -115,7 +115,7 @@ rest: 90
 start: 1
 intro: 3
 equipment: pull-up bar
-figure: PULLUP
+figure: CHINUP
 muscles: biceps lats | upper_back forearms
 cue: Underhand grip (palms toward you), hands shoulder-width apart.
 cue: Pull your chest toward the bar, elbows close to your sides. Biceps work harder than in pull-ups.
