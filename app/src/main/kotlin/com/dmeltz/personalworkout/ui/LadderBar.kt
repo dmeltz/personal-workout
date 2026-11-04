@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dmeltz.personalworkout.core.Exercise
 import com.dmeltz.personalworkout.core.ExerciseState
+import com.dmeltz.personalworkout.core.Progression
 
 /** How far the target is through the current variation's range, 0 to 1. */
 fun rangeFraction(ex: Exercise, s: ExerciseState): Float {
@@ -84,11 +85,17 @@ fun LadderDetail(ex: Exercise, s: ExerciseState?) {
                 "Target ${ex.amount(s.variation, s.target)}, in a range of ${v.min}–${v.max} " +
                     "(${(rangeFraction(ex, s) * 100).toInt()}% of the way). " +
                     if (s.variation < ex.variations.lastIndex) "Past ${v.max} you move to variation ${s.variation + 2}."
-                    else "Past ${v.max} you add a set.",
+                    else "This is the hardest variation: the target stops at ${v.max}.",
                 style = MaterialTheme.typography.bodySmall,
             )
-            if (s.sets > ex.sets) {
-                Text("+${s.sets - ex.sets} extra set, earned at the top of the ladder.", style = MaterialTheme.typography.bodySmall)
+            Text("Always ${ex.sets} sets.", style = MaterialTheme.typography.bodySmall)
+            if (Progression.atTop(ex, s)) {
+                Text(
+                    "You've reached the top of this ladder. Tell Claude in the project and you'll decide together what comes next.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = groupColors.getValue(ex.group),
+                )
             }
         }
     }

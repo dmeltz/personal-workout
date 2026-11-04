@@ -80,14 +80,29 @@ class CoreTest {
         assertEquals(1, s.struggles)
     }
 
-    @Test fun topOfTheLadderAddsASet() {
+    @Test fun topOfTheLadderHoldsTwoSets() {
         val calf = ex("CALF_RAISE")
         val top = calf.variations.lastIndex
-        val s = Progression.initial(calf, monday).copy(variation = top, target = calf.variation(top).max)
-        val next = Progression.apply(calf, s, listOf(s.target, s.target), Effort.EASY, monday)
+        val max = calf.variation(top).max
+        val s = Progression.initial(calf, monday).copy(variation = top, target = max)
+        val next = Progression.apply(calf, s, listOf(max + 3, max + 3), Effort.EASY, monday)
         assertEquals(top, next.variation)
-        assertEquals(3, next.sets)
-        assertTrue(Progression.level(calf, next) > Progression.level(calf, s))
+        assertEquals(calf.sets, next.sets, "sets never change")
+        assertEquals(max, next.target, "the target stops at the top of the range")
+        assertTrue(Progression.atTop(calf, next))
+        assertFalse(Progression.atTop(calf, next.copy(target = max - 1)))
+    }
+
+    @Test fun savedSetsGoBackToTheUsual() {
+        val old = AppState(
+            version = 1,
+            exercises = mapOf("CALF_RAISE" to ExerciseState(variation = 2, target = 15, sets = 3, introducedOn = 1)),
+            startLevels = mapOf("PULLUP" to StartLevel(1, 5, 3)),
+        )
+        val new = Migrations.run(library, old)
+        assertEquals(2, new.exerciseState("CALF_RAISE")!!.sets)
+        assertEquals(2, new.startLevels["PULLUP"]!!.sets)
+        assertEquals(new, Migrations.run(library, new))
     }
 
     @Test fun levelGrowsWithProgress() {
@@ -96,6 +111,7 @@ class CoreTest {
         assertEquals(2.0, Progression.level(pushup, a))
         assertEquals(2.5, Progression.level(pushup, a.copy(target = (6 + 15) / 2 + 1)), 0.1)
         assertEquals(3.0, Progression.level(pushup, a.copy(variation = 2, target = pushup.variation(2).min)))
+        assertEquals(2.0, Progression.level(pushup, a.copy(sets = 3)), 1e-9, "sets don't count in the level")
     }
 
     @Test fun restDaysDontBreakTheStreak() {
@@ -216,7 +232,7 @@ class LevelsTest {
             "PULLUP" to StartLevel(variation = 2, target = 99, sets = 2),
         ), day)
         val p = state.exerciseState("PUSHUP")!!
-        assertEquals(listOf(2, 10, 3, 0), listOf(p.variation, p.target, p.sets, p.struggles))
+        assertEquals(listOf(2, 10, 2, 0), listOf(p.variation, p.target, p.sets, p.struggles))
         assertEquals(null, state.exerciseState("PULLUP"), "setting a level doesn't start an exercise")
         assertEquals(StartLevel(2, pull.variation(2).max, 2), state.startLevels["PULLUP"], "the target is kept inside the range")
         assertEquals(day, state.levelHistory.single().day)
