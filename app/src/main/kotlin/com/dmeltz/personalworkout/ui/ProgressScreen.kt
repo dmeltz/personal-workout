@@ -239,7 +239,7 @@ fun LevelChart(series: List<LineSeries>, modifier: Modifier) {
                         moveTo(at(s.points[0]).x, at(s.points[0]).y)
                         for (p in s.points.drop(1)) lineTo(at(p).x, at(p).y)
                     }
-                    drawPath(path, s.color, style = Stroke(width = (if (main) 3 else 1.5f).dp.toPx()))
+                    drawPath(path, s.color, style = Stroke(width = (if (main) 3f else 1.5f).dp.toPx()))
                     if (main && s.points.size <= 40) for (p in s.points) drawCircle(s.color, radius = 3.dp.toPx(), center = at(p))
                 }
             }
