@@ -76,6 +76,32 @@ variation: Diamond push-up | 5-12 | Index fingers and thumbs touch to make a dia
 figure: DIAMOND_PUSHUP
 cue: If your wrists or elbows complain, go back to the close-grip version.
 
+@exercise HANDSTAND
+title: Handstand
+group: push
+measure: seconds
+sets: 2
+rest: 60
+start: 1
+intro: 1
+equipment: a clear stretch of wall
+figure: HANDSTAND
+muscles: shoulders triceps | upper_back abs forearms
+cue: Arms locked straight. Push the floor away so your shoulders reach up toward your ears.
+cue: Hands shoulder-width, fingers spread, and grip the floor with your fingertips to stay balanced.
+cue: Ribs in and glutes squeezed so your body is one straight line, not a banana.
+cue: To come down, step down the way you went up, or turn one hand and cartwheel out (your capoeira aú).
+variation: Wall L-hold | 15-40 | Hands on the floor about a leg's length out from the wall, feet against it. Walk your feet up the wall to hip height and walk your hands in until your hips are over your shoulders, body in an L.
+figure: HS_WALL_L
+variation: Chest-to-wall handstand | 15-45 | Start in a push-up position with your feet at the wall. Walk your feet up the wall and your hands in until your chest almost touches it, then hold.
+figure: HS_CHEST_WALL
+cue: Walk down the same way. Your hands end a hand's width from the wall.
+variation: Back-to-wall handstand | 15-45 | Hands about a hand's length from the wall. Kick up one leg at a time and let your heels rest on the wall, then hold.
+figure: HS_BACK_WALL
+cue: Take your heels off the wall for a second or two at a time when the hold feels easy.
+variation: Freestanding handstand | 5-20 | Kick up away from the wall, on grass or near the wall as a backstop, and balance on your hands. Count your best hold of each try.
+figure: HANDSTAND
+
 // ───────────────────────────── PULL ─────────────────────────────
 
 @exercise DEAD_HANG

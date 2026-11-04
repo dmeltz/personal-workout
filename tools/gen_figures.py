@@ -762,6 +762,42 @@ def bear_side(step):
     return s
 figure("BEAR_LATERAL", [bear_side(0), bear_side(1), bear_side(0), bear_side(-1)], ["front", "high"], props=[mat()], loop=True, ms=2800)
 
+# ── Handstands ──
+# Upside down: pitch 180 points the head at the floor and the chest toward -z. Below 180 the feet
+# lean toward the chest side, above 180 toward the back.
+def inverted(pitch, legs=fk(0, 3, 0), feet="line", head=-20, hands_z=0.0):
+    arms = fk(180, 0, 0)
+    return dict(pitch=pitch, head=head, armL=arms, armR=arms, legL=legs, legR=legs, feet=feet,
+                anchor=("haL", (0, 0, hands_z), "yz"))
+
+def toes_z(s):
+    j = build(s).joints()
+    return min(j["toL"][2], j["toR"][2]), max(j["toL"][2], j["toR"][2])
+
+def wall(z0, z1, top=100): return box(-20, 20, 0, top, z0, z1)
+
+# Wall L: hands on the floor, hips over the shoulders, legs level with the feet flat on the wall.
+s = inverted(180, legs=fk(90, 3, 0), feet="shin")
+zf, _ = toes_z(s)
+j = build(s).joints()
+zw = min(j["ftL"][2], j["ftR"][2]) - 0.8
+figure("HS_WALL_L", [s], ["side", "back"], props=[wall(zw - 2, zw, 66)])
+
+# Chest to the wall: walked up until nearly vertical, toes resting on the wall.
+s = inverted(176)
+zf, _ = toes_z(s)
+figure("HS_CHEST_WALL", [s], ["side", "back"], props=[wall(zf - 2.5, zf - 0.5)])
+
+# Back to the wall: kicked up, heels resting on it, hands a short way out from it.
+s = inverted(184, legs=fk(-4, 3, 0))
+_, zb = toes_z(s)
+j = build(s).joints()
+zh = max(j["ftL"][2], j["ftR"][2]) + 0.8
+figure("HS_BACK_WALL", [s], ["side", "front"], props=[wall(zh, zh + 2)])
+
+# Free: a small sway over the hands, kept up by the fingers and the wrists.
+figure("HANDSTAND", [inverted(178.5), inverted(181.5)], ["side", "front"], props=[mat()], ms=1800)
+
 
 # ───────────────────────────── frames, fitting, checks ─────────────────────────────
 
@@ -859,6 +895,8 @@ def view_data(name, view, frames):
         ys.append(0.0)
     w, h = max(xs) - min(xs), max(ys) - min(ys)
     s = min(1.0, 92 / w, 92 / h)
+    if floor_line:
+        s = min(s, 88 / h)  # the floor sits at 90, so keep the top inside the box
     cx = (max(xs) + min(xs)) / 2
     if floor_line:
         ox, oy = 50 - cx * s, 90.0  # floor (y = 0) at 90
