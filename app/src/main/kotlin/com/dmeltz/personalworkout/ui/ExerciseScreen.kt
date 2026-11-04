@@ -26,6 +26,7 @@ import com.dmeltz.personalworkout.core.Figures
 import com.dmeltz.personalworkout.core.Measure
 import com.dmeltz.personalworkout.core.Progression
 import com.dmeltz.personalworkout.core.WorkoutRecord
+import com.dmeltz.personalworkout.core.views
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
