@@ -10,6 +10,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -19,6 +21,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import com.dmeltz.personalworkout.core.Figure
 import com.dmeltz.personalworkout.core.Pose
 import com.dmeltz.personalworkout.core.Prop
+import com.dmeltz.personalworkout.core.views
 
 /** The exercise's stick figure, moving slowly between its start and end positions. */
 @Composable
@@ -59,11 +62,26 @@ fun StickFigure(figure: Figure, modifier: Modifier) {
                 Color(0xFFD08050), p(prop.x, prop.y), Size(prop.w * scale, prop.h * scale),
                 CornerRadius(5f * scale), style = Stroke(1.6f * scale),
             )
-            Prop.NoFloor -> Unit
+            Prop.NoFloor, Prop.Front -> Unit
         }
         fun limb(a: Int, b: Int, c: Int, color: Color) {
             drawLine(color, j(a), j(b), strokeWidth = w, cap = StrokeCap.Round)
             drawLine(color, j(b), j(c), strokeWidth = w, cap = StrokeCap.Round)
+        }
+        if (figure.front) {
+            // Shoulders and hips have width; both sides are drawn alike.
+            fun off(o: Offset, dx: Float) = Offset(o.x + dx * scale, o.y)
+            val neck = j(Pose.NECK); val hip = j(Pose.HIP)
+            val sl = off(neck, -Pose.SHOULDER_HALF); val sr = off(neck, Pose.SHOULDER_HALF)
+            val hl = off(hip, -Pose.HIP_HALF); val hr = off(hip, Pose.HIP_HALF)
+            fun line(a: Offset, b: Offset) = drawLine(body, a, b, strokeWidth = w, cap = StrokeCap.Round)
+            line(sl, sr); line(hl, hr); line(neck, hip)
+            line(sl, j(Pose.ELBOW)); line(j(Pose.ELBOW), j(Pose.HAND))
+            line(sr, j(Pose.ELBOW2)); line(j(Pose.ELBOW2), j(Pose.HAND2))
+            line(hl, j(Pose.KNEE)); line(j(Pose.KNEE), j(Pose.FOOT))
+            line(hr, j(Pose.KNEE2)); line(j(Pose.KNEE2), j(Pose.FOOT2))
+            drawCircle(body, radius = 5f * scale, center = j(Pose.HEAD), style = Stroke(w * 0.8f))
+            return@Canvas
         }
         // Far side first, so the near arm and leg are drawn on top.
         limb(Pose.NECK, Pose.ELBOW2, Pose.HAND2, far)
@@ -75,3 +93,12 @@ fun StickFigure(figure: Figure, modifier: Modifier) {
     }
 }
 
+
+/** All views of an exercise side by side (side view, and a front or rear view when there is one). */
+@Composable
+fun FigureViews(name: String, height: androidx.compose.ui.unit.Dp) {
+    val views = com.dmeltz.personalworkout.core.Figures.views(name)
+    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth()) {
+        for (f in views) StickFigure(f, Modifier.weight(1f).height(height))
+    }
+}

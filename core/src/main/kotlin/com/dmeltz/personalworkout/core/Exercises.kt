@@ -48,7 +48,8 @@ data class Exercise(
     val unit: String get() = if (measure == Measure.REPS) "reps" else "s"
 }
 
-data class WarmupMove(val name: String, val seconds: Int)
+/** A warm-up move; [figure] names its stick figure in [Figures], if it has one. */
+data class WarmupMove(val name: String, val seconds: Int, val figure: String? = null)
 
 data class Library(
     val exercises: List<Exercise>,
@@ -70,6 +71,8 @@ class Pose(val points: FloatArray) {
         const val ELBOW = 3; const val HAND = 4; const val ELBOW2 = 5; const val HAND2 = 6
         const val KNEE = 7; const val FOOT = 8; const val KNEE2 = 9; const val FOOT2 = 10
         const val JOINTS = 11
+        const val SHOULDER_HALF = 7f
+        const val HIP_HALF = 4.5f
     }
 }
 
@@ -82,10 +85,17 @@ sealed interface Prop {
     data class Bag(val x: Float, val y: Float, val w: Float, val h: Float) : Prop
     /** Hanging figures: no floor line, and the feet may go below 90. */
     data object NoFloor : Prop
+    /**
+     * A front or rear view: arms hang from shoulders [Pose.SHOULDER_HALF] either side of the neck,
+     * legs from hips [Pose.HIP_HALF] either side of the hip point, and both sides are drawn alike.
+     */
+    data object Front : Prop
 }
 
 /** The figure moves between [start] and [end]. */
-class Figure(val start: Pose, val end: Pose, val props: List<Prop>)
+class Figure(val start: Pose, val end: Pose, val props: List<Prop>) {
+    val front: Boolean get() = Prop.Front in props
+}
 
 /**
  * Parses the exercise library:
@@ -105,7 +115,7 @@ class Figure(val start: Pose, val end: Pose, val props: List<Prop>)
  * cue: A cue for this variation only.
  *
  * @warmup
- * move: Arm circles | 30
+ * move: Arm circles | 30 | WU_ARMS
  *
  * @safety
  * line: Stop if something hurts.
@@ -174,8 +184,8 @@ object LibraryParser {
                 line == "@safety" -> { flushExercise(); section = "safety" }
                 section == "warmup" && line.startsWith("move:") -> {
                     val parts = line.substringAfter(":").split("|").map { it.trim() }
-                    if (parts.size != 2) fail("move needs 'name | seconds'")
-                    warmup += WarmupMove(parts[0], parts[1].toIntOrNull() ?: fail("bad seconds"))
+                    if (parts.size !in 2..3) fail("move needs 'name | seconds | figure'")
+                    warmup += WarmupMove(parts[0], parts[1].toIntOrNull() ?: fail("bad seconds"), parts.getOrNull(2))
                 }
                 section == "safety" && line.startsWith("line:") -> safety += line.substringAfter(":").trim()
                 section != "exercise" -> fail("unrecognized line")
@@ -204,4 +214,14 @@ object LibraryParser {
         ids.groupBy { it }.filter { it.value.size > 1 }.keys.firstOrNull()?.let { error("Duplicate exercise $it") }
         return Library(exercises, warmup, safety)
     }
+}
+
+/**
+ * The views of an exercise's figure: the side view, plus a front or rear view when there is one.
+ * Hanging exercises read better from the front, so that view comes first for them.
+ */
+fun Figures.views(name: String): List<Figure> {
+    val side = all[name] ?: return emptyList()
+    val front = all[name + "_FRONT"] ?: return listOf(side)
+    return if (Prop.NoFloor in side.props) listOf(front, side) else listOf(side, front)
 }

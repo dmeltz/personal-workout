@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import com.dmeltz.personalworkout.core.AppState
 import com.dmeltz.personalworkout.core.Effort
 import com.dmeltz.personalworkout.core.Exercise
-import com.dmeltz.personalworkout.core.Figures
 import com.dmeltz.personalworkout.core.Progression
 import com.dmeltz.personalworkout.core.WorkoutRecord
 import java.time.LocalDate
@@ -39,7 +38,7 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(exercise.group.label, style = MaterialTheme.typography.labelLarge)
-            Figures.all[exercise.figure]?.let { StickFigure(it, Modifier.fillMaxWidth().height(170.dp)) }
+            FigureViews(exercise.figure, 170.dp)
             if (s != null) {
                 Text(
                     "Level %.2f · now ${s.sets} × ${s.target} $unit".format(Progression.level(exercise, s)),

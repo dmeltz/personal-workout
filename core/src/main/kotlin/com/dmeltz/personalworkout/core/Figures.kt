@@ -89,5 +89,75 @@ object Figures {
             Pose(floatArrayOf(82.0f, 64.4f, 74.0f, 64.4f, 46.0f, 64.4f, 76.3f, 77.2f, 74.0f, 90.0f, 71.7f, 77.2f, 74.0f, 90.0f, 40.8f, 83.7f, 21.5f, 88.9f, 49.5f, 84.1f, 30.7f, 90.9f)),
             listOf(),
         ),
+        "PULLUP_FRONT" to Figure(
+            Pose(floatArrayOf(49.6f, 23.4f, 49.6f, 31.4f, 49.6f, 59.4f, 39.3f, 18.8f, 37.0f, 6.0f, 60.0f, 18.8f, 62.2f, 6.0f, 44.4f, 79.3f, 44.0f, 91.3f, 54.8f, 79.3f, 55.2f, 91.3f)),
+            Pose(floatArrayOf(50.2f, 7.2f, 50.2f, 15.2f, 50.2f, 43.2f, 30.6f, 18.6f, 34.0f, 6.0f, 69.7f, 18.6f, 66.4f, 6.0f, 45.0f, 63.2f, 44.6f, 75.2f, 55.4f, 63.2f, 55.8f, 75.2f)),
+            listOf(Prop.Bar(6f), Prop.NoFloor, Prop.Front),
+        ),
+        "HANG_FRONT" to Figure(
+            Pose(floatArrayOf(49.6f, 23.4f, 49.6f, 31.4f, 49.6f, 59.4f, 39.3f, 18.8f, 37.0f, 6.0f, 60.0f, 18.8f, 62.2f, 6.0f, 44.4f, 79.3f, 43.7f, 99.3f, 54.8f, 79.3f, 55.5f, 99.3f)),
+            Pose(floatArrayOf(48.0f, 19.7f, 48.0f, 27.7f, 48.0f, 55.7f, 38.5f, 16.9f, 37.0f, 6.0f, 57.5f, 16.9f, 59.0f, 6.0f, 42.8f, 75.7f, 42.1f, 95.7f, 53.2f, 75.7f, 53.9f, 95.7f)),
+            listOf(Prop.Bar(6f), Prop.NoFloor, Prop.Front),
+        ),
+        "KNEERAISE_FRONT" to Figure(
+            Pose(floatArrayOf(49.6f, 23.4f, 49.6f, 31.4f, 49.6f, 59.4f, 39.3f, 18.8f, 37.0f, 6.0f, 60.0f, 18.8f, 62.2f, 6.0f, 44.4f, 79.3f, 43.7f, 99.3f, 54.8f, 79.3f, 55.5f, 99.3f)),
+            Pose(floatArrayOf(49.6f, 23.4f, 49.6f, 31.4f, 49.6f, 59.4f, 39.3f, 18.8f, 37.0f, 6.0f, 60.0f, 18.8f, 62.2f, 6.0f, 44.1f, 65.3f, 43.4f, 85.3f, 55.2f, 65.3f, 55.9f, 85.3f)),
+            listOf(Prop.Bar(6f), Prop.NoFloor, Prop.Front),
+        ),
+        "ROW_FRONT" to Figure(
+            Pose(floatArrayOf(51.9f, 19.7f, 51.9f, 27.7f, 51.9f, 50.1f, 46.9f, 33.2f, 49.9f, 38.3f, 56.9f, 33.2f, 54.0f, 38.3f, 45.7f, 70.0f, 45.0f, 90.0f, 58.2f, 70.0f, 58.9f, 90.0f)),
+            Pose(floatArrayOf(51.9f, 16.9f, 51.9f, 24.9f, 51.9f, 50.1f, 33.4f, 26.9f, 40.7f, 29.6f, 70.5f, 26.9f, 63.1f, 29.6f, 45.7f, 70.0f, 45.0f, 90.0f, 58.2f, 70.0f, 58.9f, 90.0f)),
+            listOf(Prop.Front),
+        ),
+        "SQUAT_FRONT" to Figure(
+            Pose(floatArrayOf(49.2f, 14.1f, 49.2f, 22.1f, 49.2f, 50.1f, 43.1f, 27.2f, 44.0f, 32.3f, 55.3f, 27.2f, 54.4f, 32.3f, 43.0f, 70.0f, 43.0f, 90.0f, 55.5f, 70.0f, 55.5f, 90.0f)),
+            Pose(floatArrayOf(56.2f, 30.8f, 56.2f, 38.8f, 56.2f, 62.6f, 50.1f, 43.9f, 51.0f, 49.0f, 62.3f, 43.9f, 61.4f, 49.0f, 38.7f, 70.1f, 37.0f, 90.0f, 73.7f, 70.1f, 75.5f, 90.0f)),
+            listOf(Prop.Front),
+        ),
+        "PUSHUP_FRONT" to Figure(
+            Pose(floatArrayOf(46.4f, 56.2f, 46.4f, 64.2f, 46.4f, 69.8f, 37.1f, 77.0f, 36.0f, 90.0f, 55.6f, 77.0f, 56.8f, 90.0f, 41.5f, 73.8f, 41.5f, 77.8f, 51.2f, 73.8f, 51.2f, 77.8f)),
+            Pose(floatArrayOf(49.1f, 66.4f, 49.1f, 74.4f, 49.1f, 80.0f, 29.6f, 77.8f, 34.0f, 90.0f, 68.7f, 77.8f, 64.2f, 90.0f, 44.3f, 84.0f, 44.3f, 88.0f, 54.0f, 84.0f, 54.0f, 88.0f)),
+            listOf(Prop.Front),
+        ),
+        "SPLIT_FRONT" to Figure(
+            Pose(floatArrayOf(50.2f, 14.1f, 50.2f, 22.1f, 50.2f, 50.1f, 42.1f, 35.0f, 42.1f, 48.0f, 58.4f, 35.0f, 58.4f, 48.0f, 44.0f, 70.0f, 44.0f, 90.0f, 56.5f, 70.0f, 56.5f, 90.0f)),
+            Pose(floatArrayOf(49.1f, 27.0f, 49.1f, 35.0f, 49.1f, 63.0f, 41.0f, 48.0f, 41.0f, 61.0f, 57.2f, 48.0f, 57.2f, 61.0f, 44.0f, 70.0f, 44.0f, 90.0f, 55.4f, 83.0f, 55.4f, 88.0f)),
+            listOf(Prop.Front),
+        ),
+        "STEPUP_FRONT" to Figure(
+            Pose(floatArrayOf(49.8f, 14.0f, 49.8f, 22.0f, 49.8f, 50.0f, 41.7f, 35.0f, 41.7f, 48.0f, 57.9f, 35.0f, 57.9f, 48.0f, 44.3f, 61.0f, 44.3f, 81.0f, 55.0f, 70.0f, 55.0f, 90.0f)),
+            Pose(floatArrayOf(50.2f, -2.0f, 50.2f, 6.0f, 50.2f, 34.0f, 42.1f, 19.0f, 42.1f, 32.0f, 58.3f, 19.0f, 58.3f, 32.0f, 45.0f, 54.0f, 45.0f, 74.0f, 55.4f, 54.0f, 55.4f, 74.0f)),
+            listOf(Prop.Box(34f, 74f, 32f, 16f), Prop.Front),
+        ),
+        "BAG_FRONT" to Figure(
+            Pose(floatArrayOf(46.2f, 14.4f, 46.2f, 22.4f, 46.2f, 50.4f, 37.0f, 35.2f, 40.3f, 22.6f, 55.5f, 35.2f, 52.1f, 22.6f, 38.3f, 70.1f, 40.0f, 90.0f, 54.2f, 70.1f, 52.5f, 90.0f)),
+            Pose(floatArrayOf(46.2f, 14.4f, 46.2f, 22.4f, 46.2f, 50.4f, 37.0f, 35.2f, 40.3f, 22.6f, 58.9f, 19.1f, 64.5f, 15.9f, 38.3f, 70.1f, 40.0f, 90.0f, 54.2f, 70.1f, 52.5f, 90.0f)),
+            listOf(Prop.Front),
+        ),
+        "WU_MARCH" to Figure(
+            Pose(floatArrayOf(50.0f, 14.0f, 50.0f, 22.0f, 50.0f, 50.0f, 56.5f, 33.3f, 68.7f, 37.7f, 43.5f, 33.3f, 31.3f, 37.7f, 69.9f, 48.3f, 68.2f, 68.2f, 50.0f, 70.0f, 50.0f, 90.0f)),
+            Pose(floatArrayOf(50.0f, 14.0f, 50.0f, 22.0f, 50.0f, 50.0f, 43.5f, 33.3f, 31.3f, 37.7f, 56.5f, 33.3f, 68.7f, 37.7f, 50.0f, 70.0f, 50.0f, 90.0f, 69.9f, 48.3f, 68.2f, 68.2f)),
+            listOf(),
+        ),
+        "WU_ARMS" to Figure(
+            Pose(floatArrayOf(51.2f, 14.1f, 51.2f, 22.1f, 51.2f, 50.1f, 31.2f, 22.1f, 18.2f, 22.1f, 71.2f, 22.1f, 84.2f, 22.1f, 45.0f, 70.0f, 45.0f, 90.0f, 57.5f, 70.0f, 57.5f, 90.0f)),
+            Pose(floatArrayOf(51.2f, 14.1f, 51.2f, 22.1f, 51.2f, 50.1f, 36.8f, 11.4f, 29.3f, 0.8f, 65.7f, 11.4f, 73.2f, 0.8f, 45.0f, 70.0f, 45.0f, 90.0f, 57.5f, 70.0f, 57.5f, 90.0f)),
+            listOf(Prop.Front),
+        ),
+        "WU_HIPS" to Figure(
+            Pose(floatArrayOf(51.4f, 14.6f, 51.4f, 22.6f, 51.4f, 50.6f, 36.1f, 32.6f, 45.9f, 36.1f, 66.8f, 32.6f, 57.0f, 36.1f, 43.5f, 70.3f, 40.0f, 90.0f, 52.5f, 70.3f, 49.0f, 90.0f)),
+            Pose(floatArrayOf(37.6f, 14.6f, 37.6f, 22.6f, 37.6f, 50.6f, 22.2f, 32.6f, 32.0f, 36.1f, 52.9f, 32.6f, 43.1f, 36.1f, 36.5f, 70.3f, 40.0f, 90.0f, 45.5f, 70.3f, 49.0f, 90.0f)),
+            listOf(Prop.Front),
+        ),
+        "WU_HINGE" to Figure(
+            Pose(floatArrayOf(50.0f, 14.0f, 50.0f, 22.0f, 50.0f, 50.0f, 59.2f, 31.2f, 47.9f, 24.7f, 59.2f, 31.2f, 47.9f, 24.7f, 50.0f, 70.0f, 50.0f, 90.0f, 50.0f, 70.0f, 50.0f, 90.0f)),
+            Pose(floatArrayOf(84.8f, 42.0f, 77.0f, 44.1f, 50.0f, 51.4f, 74.8f, 56.9f, 81.3f, 45.7f, 74.8f, 56.9f, 81.3f, 45.7f, 55.2f, 70.7f, 50.0f, 90.0f, 55.2f, 70.7f, 50.0f, 90.0f)),
+            listOf(),
+        ),
+        "WU_SHOULDERS" to Figure(
+            Pose(floatArrayOf(46.3f, 15.8f, 51.2f, 22.1f, 51.2f, 50.1f, 43.8f, 35.1f, 43.8f, 48.1f, 58.7f, 35.1f, 58.7f, 48.1f, 45.0f, 70.0f, 45.0f, 90.0f, 57.5f, 70.0f, 57.5f, 90.0f)),
+            Pose(floatArrayOf(56.2f, 15.8f, 51.2f, 22.1f, 51.2f, 50.1f, 43.9f, 33.1f, 43.9f, 46.1f, 58.6f, 33.1f, 58.6f, 46.1f, 45.0f, 70.0f, 45.0f, 90.0f, 57.5f, 70.0f, 57.5f, 90.0f)),
+            listOf(Prop.Front),
+        ),
     )
 }

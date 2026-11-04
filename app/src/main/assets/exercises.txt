@@ -348,11 +348,11 @@ variation: Lateral bear crawl | 15-45 | Crawl sideways, both directions.
 // ───────────────────────────── WARM-UP ─────────────────────────────
 
 @warmup
-move: March on the spot, swinging your arms | 30
-move: Arm circles, forward then back | 20
-move: Hip circles | 20
-move: Bodyweight good mornings (hinge at the hips, flat back) | 20
-move: Shoulder rolls and neck turns | 20
+move: March on the spot, swinging your arms | 30 | WU_MARCH
+move: Arm circles, forward then back | 20 | WU_ARMS
+move: Hip circles, hands on hips | 20 | WU_HIPS
+move: Good mornings: hinge at the hips with a flat back | 20 | WU_HINGE
+move: Shoulder rolls and slow neck turns | 20 | WU_SHOULDERS
 
 // ───────────────────────────── SAFETY ─────────────────────────────
 

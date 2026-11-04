@@ -55,7 +55,6 @@ import com.dmeltz.personalworkout.core.AppState
 import com.dmeltz.personalworkout.core.Effort
 import com.dmeltz.personalworkout.core.Exercise
 import com.dmeltz.personalworkout.core.ExerciseState
-import com.dmeltz.personalworkout.core.Figures
 import com.dmeltz.personalworkout.core.Library
 import com.dmeltz.personalworkout.core.Mascot
 import com.dmeltz.personalworkout.core.Measure
@@ -205,6 +204,12 @@ private fun WarmupView(moves: List<WarmupMove>, onDoneClick: () -> Unit) {
     }
     PipSays(Mood.CALM, "Two minutes of warm-up first. Your joints will thank you.")
     Text("Warm-up", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+    // The current move's figure (the first one before the timer starts).
+    val shownMove = moves.getOrNull(index.coerceAtLeast(0))
+    shownMove?.figure?.let { name ->
+        key(name) { FigureViews(name, 170.dp) }
+        Text(shownMove.name, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+    }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             moves.forEachIndexed { i, m ->
@@ -265,7 +270,7 @@ private fun ExerciseView(
     if (es.times == 0) PipSays(Mood.CALM, Mascot.newExercise(), size = 48.dp)
     Text(v.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
     if (v.name != ex.title) Text(ex.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.outline)
-    Figures.all[ex.figure]?.let { StickFigure(it, Modifier.fillMaxWidth().height(190.dp)) }
+    FigureViews(ex.figure, 190.dp)
     Text(v.how, style = MaterialTheme.typography.bodyLarge)
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

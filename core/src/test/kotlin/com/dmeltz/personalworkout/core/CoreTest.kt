@@ -23,6 +23,10 @@ class CoreTest {
             assertTrue(e.variations.all { it.how.isNotBlank() }, "${e.id} has a variation without a description")
         }
         assertTrue(library.warmup.isNotEmpty())
+        for (m in library.warmup) assertNotNull(m.figure?.let { Figures.all[it] }, "warm-up ${m.name} has no figure")
+        for (f in Figures.all.values) if (f.front) assertTrue(Prop.Front in f.props)
+        assertEquals(2, Figures.views("PULLUP").size)
+        assertTrue(Figures.views("PULLUP").first().front, "hanging exercises show the front view first")
         assertTrue(library.safety.any { "hurt" in it })
         for (f in Figures.all.values) assertEquals(Pose.JOINTS * 2, f.start.points.size)
     }
