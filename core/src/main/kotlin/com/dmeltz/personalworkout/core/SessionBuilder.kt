@@ -21,8 +21,8 @@ data class SessionPlan(
 
 object SessionBuilder {
     /** Exercise time, not counting the warm-up (about 2 minutes). */
-    const val NORMAL_SECONDS = 12 * 60
-    const val LIGHT_SECONDS = 7 * 60
+    const val NORMAL_SECONDS = 16 * 60
+    const val LIGHT_SECONDS = 9 * 60
     const val MIN_EXERCISES = 3
     const val MAX_EXERCISES = 7
     /** Minimum days between two new exercises, and sessions before the first one. */

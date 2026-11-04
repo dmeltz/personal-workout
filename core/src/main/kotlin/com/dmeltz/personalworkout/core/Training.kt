@@ -140,7 +140,7 @@ const val WEIGH_IN_DAYS = 7
 
 /** Updates a saved state to the current exercise library. */
 object Migrations {
-    const val CURRENT = 1
+    const val CURRENT = 2
 
     fun run(library: Library, state: AppState): AppState {
         var s = state
@@ -151,6 +151,14 @@ object Migrations {
                 val ex = library.exercise(id)
                 if (ex != null && ex.sidesAt(es.variation) == Sides.ALTERNATE) es.copy(target = (es.target + 1) / 2) else es
             })
+        }
+        if (s.version < 2) {
+            // Version 2: every exercise does 3 sets instead of 2, so each saved set count moves up one
+            // (an extra set earned at the top of a ladder stays extra).
+            s = s.copy(
+                exercises = s.exercises.mapValues { (_, es) -> es.copy(sets = (es.sets + 1).coerceAtMost(Progression.MAX_SETS)) },
+                startLevels = s.startLevels.mapValues { (_, l) -> l.copy(sets = (l.sets + 1).coerceAtMost(Progression.MAX_SETS)) },
+            )
         }
         return s.copy(version = CURRENT)
     }
@@ -210,7 +218,7 @@ object Levels {
 }
 
 object Progression {
-    const val MAX_SETS = 3
+    const val MAX_SETS = 4
     /** Level per set above or below an exercise's usual number of sets. */
     const val SET_WEIGHT = 0.5
 

@@ -86,7 +86,7 @@ class CoreTest {
         val s = Progression.initial(calf, monday).copy(variation = top, target = calf.variation(top).max)
         val next = Progression.apply(calf, s, listOf(s.target, s.target), Effort.EASY, monday)
         assertEquals(top, next.variation)
-        assertEquals(3, next.sets)
+        assertEquals(calf.sets + 1, next.sets)
         // Adding the set at the top of the ladder keeps the level where it was: no jump.
         assertEquals(Progression.level(calf, s), Progression.level(calf, next), 0.06)
         // Falling below the range with the extra set drops it again, at mid-range: no jump either way.
@@ -128,7 +128,7 @@ class CoreTest {
         val plan = SessionBuilder.build(library, AppState(), monday)
         assertTrue(plan.exerciseIds.size >= SessionBuilder.MIN_EXERCISES)
         assertTrue(plan.startIds.size >= 5)
-        assertTrue(plan.minutes in 8..20, "first session takes ${plan.minutes} minutes")
+        assertTrue(plan.minutes in 8..24, "first session takes ${plan.minutes} minutes")
         val groups = plan.exerciseIds.map { ex(it).group }
         assertTrue(groups.distinct().size >= 3)
     }
@@ -306,5 +306,23 @@ class SidesTest {
         assertEquals(Migrations.CURRENT, new.version)
         assertEquals(new, Migrations.run(lib, new), "running it again changes nothing")
         kotlin.test.assertTrue(bug.variations.all { it.min >= 3 })
+    }
+
+    @Test
+    fun savedSetsMoveUpToThree() {
+        val old = AppState(
+            version = 1,
+            exercises = mapOf(
+                "SQUAT" to ExerciseState(variation = 1, target = 14, sets = 2, introducedOn = 1),
+                "CALF_RAISE" to ExerciseState(variation = 2, target = 15, sets = 3, introducedOn = 1),
+            ),
+            startLevels = mapOf("PULLUP" to StartLevel(1, 5, 2)),
+        )
+        val new = Migrations.run(lib, old)
+        assertEquals(3, new.exerciseState("SQUAT")!!.sets)
+        assertEquals(4, new.exerciseState("CALF_RAISE")!!.sets, "the extra set stays extra")
+        assertEquals(3, new.startLevels["PULLUP"]!!.sets)
+        assertEquals(Progression.level(lib.exercise("SQUAT")!!, new.exerciseState("SQUAT")!!), 2.0 + 2.0 / 13, 0.01)
+        assertEquals(new, Migrations.run(lib, new))
     }
 }

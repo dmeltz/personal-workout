@@ -12,7 +12,7 @@
 title: Push-up
 group: push
 measure: reps
-sets: 2
+sets: 3
 rest: 60
 start: 2
 intro: 1
@@ -38,7 +38,7 @@ figure: ARCHER_PUSHUP
 title: Pike push-up
 group: push
 measure: reps
-sets: 2
+sets: 3
 rest: 60
 start: 1
 intro: 2
@@ -59,7 +59,7 @@ cue: Start with your knees bent if your hamstrings are tight.
 title: Close-grip push-up
 group: push
 measure: reps
-sets: 2
+sets: 3
 rest: 60
 start: 1
 intro: 4
@@ -80,7 +80,7 @@ cue: If your wrists or elbows complain, go back to the close-grip version.
 title: Handstand
 group: push
 measure: seconds
-sets: 2
+sets: 3
 rest: 60
 start: 1
 intro: 1
@@ -108,7 +108,7 @@ figure: HANDSTAND
 title: Hang from the bar
 group: pull
 measure: seconds
-sets: 2
+sets: 3
 rest: 60
 start: 2
 intro: 1
@@ -131,7 +131,7 @@ figure: HANG_FLEXED
 title: Pull-up
 group: pull
 measure: reps
-sets: 2
+sets: 3
 rest: 90
 start: 2
 intro: 1
@@ -156,7 +156,7 @@ figure: PULLUP_SLOW
 title: Chin-up
 group: pull
 measure: reps
-sets: 2
+sets: 3
 rest: 90
 start: 1
 intro: 3
@@ -177,7 +177,7 @@ figure: CHINUP_SLOW
 title: Door towel row
 group: pull
 measure: reps
-sets: 2
+sets: 3
 rest: 60
 start: 1
 intro: 2
@@ -203,7 +203,7 @@ figure: ROW_ONE_ARM
 title: Squat
 group: legs
 measure: reps
-sets: 2
+sets: 3
 rest: 60
 start: 2
 intro: 1
@@ -227,7 +227,7 @@ figure: PISTOL
 title: Split squat
 group: legs
 measure: reps
-sets: 2
+sets: 3
 rest: 45
 start: 2
 intro: 2
@@ -251,7 +251,7 @@ figure: BULGARIAN_SLOW
 title: Glute bridge
 group: legs
 measure: reps
-sets: 2
+sets: 3
 rest: 45
 start: 2
 intro: 1
@@ -271,7 +271,7 @@ figure: HIP_THRUST
 title: Calf raise
 group: legs
 measure: reps
-sets: 2
+sets: 3
 rest: 45
 start: 1
 intro: 3
@@ -290,7 +290,7 @@ figure: CALF_ONE_LEG
 title: Step-up
 group: legs
 measure: reps
-sets: 2
+sets: 3
 rest: 45
 start: 1
 intro: 4
@@ -314,7 +314,7 @@ figure: STEPUP_SLOW
 title: Plank
 group: core
 measure: seconds
-sets: 2
+sets: 3
 rest: 45
 start: 2
 intro: 1
@@ -336,7 +336,7 @@ figure: PLANK_LEG_LIFT
 title: Side plank
 group: core
 measure: seconds
-sets: 2
+sets: 3
 rest: 30
 start: 1
 intro: 2
@@ -356,7 +356,7 @@ figure: SIDEPLANK_LEG
 title: Dead bug
 group: core
 measure: reps
-sets: 2
+sets: 3
 rest: 30
 start: 1
 intro: 1
@@ -377,7 +377,7 @@ figure: DEADBUG_STRAIGHT
 title: Bird dog
 group: core
 measure: reps
-sets: 2
+sets: 3
 rest: 30
 start: 1
 intro: 3
@@ -398,7 +398,7 @@ figure: SUPERMAN
 title: Hanging knee raise
 group: core
 measure: reps
-sets: 2
+sets: 3
 rest: 60
 start: 1
 intro: 2
@@ -422,7 +422,7 @@ figure: LEG_RAISE
 title: Bag rounds
 group: conditioning
 measure: seconds
-sets: 2
+sets: 3
 rest: 45
 start: 1
 intro: 2
@@ -443,7 +443,7 @@ figure: BAG_HOOKS
 title: Bear crawl
 group: conditioning
 measure: seconds
-sets: 2
+sets: 3
 rest: 45
 start: 1
 intro: 4
