@@ -83,41 +83,58 @@ data class Library(
     fun inGroup(group: Group): List<Exercise> = exercises.filter { it.group == group }
 }
 
-/** A stick figure pose: x,y pairs in a 100x100 box (y down, floor at 90), in [Pose.JOINTS] order. */
+/**
+ * A stick figure pose, projected from the 3D model in tools/gen_figures.py: x, y and depth for each
+ * joint in [Pose.JOINTS] order. x and y are in a 100 x 104 box (y down); a smaller depth is nearer.
+ */
 class Pose(val points: FloatArray) {
-    fun x(joint: Int) = points[joint * 2]
-    fun y(joint: Int) = points[joint * 2 + 1]
+    fun x(joint: Int) = points[joint * 3]
+    fun y(joint: Int) = points[joint * 3 + 1]
+    fun depth(joint: Int) = points[joint * 3 + 2]
 
     companion object {
-        const val HEAD = 0; const val NECK = 1; const val HIP = 2
-        const val ELBOW = 3; const val HAND = 4; const val ELBOW2 = 5; const val HAND2 = 6
-        const val KNEE = 7; const val FOOT = 8; const val KNEE2 = 9; const val FOOT2 = 10
-        const val JOINTS = 11
-        const val SHOULDER_HALF = 7f
-        const val HIP_HALF = 4.5f
+        const val HEAD = 0; const val EYE_L = 1; const val EYE_R = 2; const val NECK = 3
+        const val SHOULDER_L = 4; const val ELBOW_L = 5; const val HAND_L = 6
+        const val SHOULDER_R = 7; const val ELBOW_R = 8; const val HAND_R = 9
+        const val PELVIS = 10
+        const val HIP_L = 11; const val KNEE_L = 12; const val FOOT_L = 13; const val TOE_L = 14
+        const val HIP_R = 15; const val KNEE_R = 16; const val FOOT_R = 17; const val TOE_R = 18
+        const val JOINTS = 19
+
+        /** The body's lines, as joint pairs. */
+        val SEGMENTS = intArrayOf(
+            NECK, HEAD, NECK, PELVIS, SHOULDER_L, SHOULDER_R, HIP_L, HIP_R,
+            SHOULDER_L, ELBOW_L, ELBOW_L, HAND_L, SHOULDER_R, ELBOW_R, ELBOW_R, HAND_R,
+            HIP_L, KNEE_L, KNEE_L, FOOT_L, FOOT_L, TOE_L, HIP_R, KNEE_R, KNEE_R, FOOT_R, FOOT_R, TOE_R,
+        )
     }
 }
 
+/** Equipment and floor marks, already projected into the figure's box. */
 sealed interface Prop {
-    data class Bar(val y: Float) : Prop
-    data class Wall(val x: Float) : Prop
-    /** A door frame at [x], with a towel from the hands to a handle at [handleY]. */
-    data class Door(val x: Float, val handleY: Float) : Prop
-    data class Box(val x: Float, val y: Float, val w: Float, val h: Float) : Prop
+    /** A bar seen along its length, a box edge, a door edge, or a faint mat outline. */
+    data class Line(val x1: Float, val y1: Float, val x2: Float, val y2: Float, val width: Float, val faint: Boolean) : Prop
+    /** A bar seen end-on. */
+    data class Dot(val x: Float, val y: Float, val r: Float) : Prop
     data class Bag(val x: Float, val y: Float, val w: Float, val h: Float) : Prop
-    /** Hanging figures: no floor line, and the feet may go below 90. */
-    data object NoFloor : Prop
-    /**
-     * A front or rear view: arms hang from shoulders [Pose.SHOULDER_HALF] either side of the neck,
-     * legs from hips [Pose.HIP_HALF] either side of the hip point, and both sides are drawn alike.
-     */
-    data object Front : Prop
+    /** A towel from a joint (a hand) to a fixed point. */
+    data class Tether(val joint: Int, val x: Float, val y: Float) : Prop
 }
 
-/** The figure moves between [start] and [end]. */
-class Figure(val start: Pose, val end: Pose, val props: List<Prop>) {
-    val front: Boolean get() = Prop.Front in props
-}
+/**
+ * One view of an exercise, as [frames] the figure moves through: back and forth, or round in a
+ * [loop]. [scale] is how much the body was shrunk to fit (1 = life size in the box); [floor] draws
+ * the floor line at y = 90.
+ */
+class Figure(
+    val frames: List<Pose>,
+    val props: List<Prop>,
+    val floor: Boolean,
+    val scale: Float,
+    val label: String,
+    val loop: Boolean,
+    val durationMs: Int,
+)
 
 /**
  * Parses the exercise library:
@@ -246,12 +263,5 @@ object LibraryParser {
     }
 }
 
-/**
- * The views of an exercise's figure: the side view, plus a front or rear view when there is one.
- * Hanging exercises read better from the front, so that view comes first for them.
- */
-fun Figures.views(name: String): List<Figure> {
-    val side = all[name] ?: return emptyList()
-    val front = all[name + "_FRONT"] ?: return listOf(side)
-    return if (Prop.NoFloor in side.props) listOf(front, side) else listOf(side, front)
-}
+/** The views of an exercise's figure, main view first (for example the side, then the front). */
+fun Figures.views(name: String): List<Figure> = listOfNotNull(all[name], all[name + "_2"])

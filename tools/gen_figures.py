@@ -1,295 +1,747 @@
-"""Builds the exercise stick figures by forward kinematics, writes Figures.kt and a preview PNG.
+"""Builds the exercise stick figures from a 3D body model, writes Figures.kt and a contact sheet.
 
 Run from the repository root:
   python3 tools/gen_figures.py /tmp/figures.png core/src/main/kotlin/com/dmeltz/personalworkout/core/Figures.kt
-Names match the "figure:" lines in app/src/main/assets/exercises.txt.
 
-Screen coordinates, 100x100 box, y down, floor at y=90. Angles in degrees: 0 right, 90 down, 180 left, -90 up.
+Every exercise is posed once, in 3D, as a few keyframes. Each view (side, front, back or a raised
+three-quarter view) is a projection of the same poses, so the views always agree. Limbs that touch
+something (hands on the bar or floor, feet on the floor or a box) are placed by inverse kinematics on
+fixed points, so contacts hold, and check() reports any contact the body can't reach.
+
+World: x = the person's left (before any turn), y = up, z = the way they face. Floor at y = 0.
+Lengths: torso 28, neck 8, upper arm 13, forearm 13, thigh 20, shin 20, foot 5, head radius 5.
 """
 import math, sys
+import numpy as np
 from PIL import Image, ImageDraw
 
-L = dict(torso=28, neck=8, thigh=20, shin=20, upper=13, fore=13)
-FLOOR = 90
+TORSO, NECK, UPPER, FORE, THIGH, SHIN, FOOT, HEAD_R = 28, 8, 13, 13, 20, 20, 5, 5
+SH, HH = 7.0, 4.5  # half shoulder and hip width
+X, Y, Z = np.array([1., 0, 0]), np.array([0., 1, 0]), np.array([0., 0, 1])
 
-def at(p, ang, length):
-    r = math.radians(ang)
-    return (p[0] + length * math.cos(r), p[1] + length * math.sin(r))
 
-def pose(torso, arm, leg, arm2=None, leg2=None, head=None, anchor=("foot", (50, FLOOR))):
-    """arm/leg are (upper angle, lower angle). Returns joint dict, shifted so anchor joint sits at anchor point."""
-    hip = (0.0, 0.0)
-    neck = at(hip, torso, L["torso"])
-    j = dict(hip=hip, neck=neck)
-    j["head"] = at(neck, torso if head is None else head, L["neck"])
-    j["elbow"] = at(neck, arm[0], L["upper"]); j["hand"] = at(j["elbow"], arm[1], L["fore"])
-    j["knee"] = at(hip, leg[0], L["thigh"]); j["foot"] = at(j["knee"], leg[1], L["shin"])
-    a2 = arm2 or arm; l2 = leg2 or leg
-    j["elbow2"] = at(neck, a2[0], L["upper"]); j["hand2"] = at(j["elbow2"], a2[1], L["fore"])
-    j["knee2"] = at(hip, l2[0], L["thigh"]); j["foot2"] = at(j["knee2"], l2[1], L["shin"])
-    name, (ax, ay) = anchor
-    dx, dy = ax - j[name][0], ay - j[name][1]
-    return {k: (v[0] + dx, v[1] + dy) for k, v in j.items()}
+def unit(v):
+    n = np.linalg.norm(v)
+    return v / n if n > 1e-9 else v
 
-SH, HH = 7, 4.5  # half shoulder and hip width, front views
 
-def front_pose(arm, leg, arm2=None, leg2=None, ts=1.0, head=-90, anchor=("foot", (50, FLOOR))):
-    """A front or rear view. arm/leg are (upper angle, lower angle[, upper scale, lower scale]); the
-    scales shorten segments that point toward or away from the viewer. arm/leg are the viewer's left;
-    arm2/leg2 default to their mirror image. ts scales the torso the same way."""
-    def full(x): return tuple(x) + (1.0, 1.0) if len(x) == 2 else tuple(x)
-    def mirror(x): x = full(x); return (180 - x[0], 180 - x[1], x[2], x[3])
-    arm = full(arm); leg = full(leg)
-    a2 = full(arm2) if arm2 else mirror(arm); l2 = full(leg2) if leg2 else mirror(leg)
-    hip = (0.0, 0.0)
-    neck = at(hip, -90, L["torso"] * ts)
-    j = dict(hip=hip, neck=neck, head=at(neck, head, L["neck"]))
-    for side, (ar, lg, sx) in {"": (arm, leg, -1), "2": (a2, l2, 1)}.items():
-        sh = (neck[0] + sx * SH, neck[1]); hp = (hip[0] + sx * HH, hip[1])
-        j["elbow" + side] = at(sh, ar[0], L["upper"] * ar[2]); j["hand" + side] = at(j["elbow" + side], ar[1], L["fore"] * ar[3])
-        j["knee" + side] = at(hp, lg[0], L["thigh"] * lg[2]); j["foot" + side] = at(j["knee" + side], lg[1], L["shin"] * lg[3])
-    name, (ax, ay) = anchor
-    dx, dy = ax - j[name][0], ay - j[name][1]
-    return {k: (v[0] + dx, v[1] + dy) for k, v in j.items()}
+def rot(v, axis, deg):
+    """Rotates v about axis by deg (right hand rule)."""
+    k = unit(axis); t = math.radians(deg)
+    return v * math.cos(t) + np.cross(k, v) * math.sin(t) + k * np.dot(k, v) * (1 - math.cos(t))
 
-S = 90  # straight down
-F = {}
-# Each figure: (start pose, end pose, props). Props: ("bar", y), ("box", x, y, w, h), ("bag", x, y, w, h), ("wall", x)
-F["PUSHUP"] = (
-    pose(-21, (90, 90), (159, 159), anchor=("hand", (70, FLOOR))),
-    pose(-5, (200, 53), (175, 175), anchor=("hand", (70, FLOOR))),
-    [],
-)
-F["PIKE"] = (
-    pose(48, (60, 60), (106, 106), head=60, anchor=("hand", (70, FLOOR))),
-    pose(62, (200, 70), (118, 118), head=70, anchor=("hand", (70, FLOOR))),
-    [],
-)
-F["PULLUP"] = (
-    pose(-90, (-90, -90), (100, 160), anchor=("hand", (50, 6))),
-    pose(-90, (-150, -40), (100, 160), arm2=(-30, -140), anchor=("hand", (40, 6))),
-    [("bar", 6), ("nofloor",)],
-)
-F["HANG"] = (
-    pose(-90, (-90, -90), (95, 95), anchor=("hand", (50, 6))),
-    pose(-90, (-93, -90), (97, 97), anchor=("hand", (50, 9))),
-    [("bar", 6), ("nofloor",)],
-)
-F["ROW"] = (
-    pose(-118, (-20, -20), (62, 62), anchor=("foot", (74, FLOOR))),
-    pose(-102, (150, -35), (78, 78), anchor=("foot", (74, FLOOR))),
-    [("door", 82, 48)],
-)
-F["SQUAT"] = (
-    pose(-90, (0, 0), (90, 90), anchor=("foot", (50, FLOOR))),
-    pose(-60, (0, 0), (30, 120), anchor=("foot", (50, FLOOR))),
-    [],
-)
-F["SPLIT"] = (
-    pose(-90, (90, 90), (72, 100), leg2=(110, 118), anchor=("foot", (60, FLOOR))),
-    pose(-88, (90, 90), (15, 90), leg2=(92, 175), anchor=("foot", (60, FLOOR))),
-    [],
-)
-F["BRIDGE"] = (
-    pose(180, (0, 0), (-45, 68), anchor=("neck", (30, FLOOR - 3))),
-    pose(160, (5, 0), (-20, 85), anchor=("neck", (30, FLOOR - 3))),
-    [],
-)
-F["CALF"] = (
-    pose(-90, (90, 90), (90, 90), anchor=("foot", (50, FLOOR))),
-    pose(-90, (90, 90), (90, 90), anchor=("foot", (50, FLOOR - 4))),
-    [],
-)
-F["STEPUP"] = (
-    pose(-85, (90, 90), (20, 90), leg2=(95, 95), anchor=("foot2", (40, FLOOR))),
-    pose(-90, (90, 90), (90, 90), leg2=(80, 130), anchor=("foot", (62, FLOOR - 16))),
-    [("box", 52, FLOOR - 16, 26, 16)],
-)
-F["PLANK"] = (
-    pose(-8, (90, 0), (172, 172), anchor=("hand", (84, FLOOR))),
-    pose(-8, (90, 0), (172, 172), anchor=("hand", (84, FLOOR))),
-    [],
-)
-F["SIDEPLANK"] = (
-    pose(-20, (90, 90), (160, 160), arm2=(-90, -90), anchor=("hand", (70, FLOOR))),
-    pose(-20, (90, 90), (160, 160), arm2=(-90, -90), leg2=(176, 176), anchor=("hand", (70, FLOOR))),
-    [],
-)
-F["KNEERAISE"] = (
-    pose(-90, (-90, -90), (90, 90), anchor=("hand", (50, 6))),
-    pose(-97, (-85, -90), (-10, 90), anchor=("hand", (50, 6))),
-    [("bar", 6), ("nofloor",)],
-)
-F["DEADBUG"] = (
-    pose(180, (-90, -90), (-90, 0), anchor=("hip", (58, FLOOR - 3))),
-    pose(180, (-90, -90), (-90, 0), arm2=(180, 180), leg2=(-5, -5), anchor=("hip", (58, FLOOR - 3))),
-    [],
-)
-F["BIRDDOG"] = (
-    pose(-12, (90, 90), (90, 180), anchor=("knee", (40, FLOOR))),
-    pose(-12, (-5, -5), (90, 180), arm2=(90, 90), leg2=(175, 175), anchor=("knee", (40, FLOOR))),
-    [],
-)
-F["BAG"] = (
-    pose(-85, (60, -60), (100, 80), leg2=(75, 100), anchor=("foot", (30, FLOOR))),
-    pose(-80, (0, 0), (100, 80), arm2=(60, -60), leg2=(75, 100), anchor=("foot", (30, FLOOR))),
-    [("bag", 66, 10, 16, 52)],
-)
-F["BEAR"] = (
-    pose(0, (90, 90), (80, 160), leg2=(105, 165), anchor=("hand", (72, FLOOR))),
-    pose(0, (80, 100), (105, 165), arm2=(100, 80), leg2=(80, 160), anchor=("hand", (74, FLOOR))),
-    [],
-)
 
-# Front or rear views, shown next to the side view. Floor exercises (planks, bridges, crawls) only
-# have a side view: seen head-on they are just a foreshortened tangle.
-FRONT = [("front",)]
-F["PULLUP_FRONT"] = (
-    front_pose((-105, -100), (92, 92, 1, 0.6), anchor=("hand", (37, 6))),
-    front_pose((165, -75), (92, 92, 1, 0.6), anchor=("hand", (34, 6))),
-    [("bar", 6), ("nofloor",)] + FRONT,
-)
-F["HANG_FRONT"] = (
-    front_pose((-105, -100), (92, 92), anchor=("hand", (37, 6))),
-    front_pose((-103, -98, 0.85, 0.85), (92, 92), anchor=("hand", (37, 6))),
-    [("bar", 6), ("nofloor",)] + FRONT,
-)
-F["KNEERAISE_FRONT"] = (
-    front_pose((-105, -100), (92, 92), anchor=("hand", (37, 6))),
-    front_pose((-105, -100), (100, 92, 0.3, 1), anchor=("hand", (37, 6))),
-    [("bar", 6), ("nofloor",)] + FRONT,
-)
-F["ROW_FRONT"] = (
-    front_pose((70, 60, 0.45, 0.45), (95, 92), ts=0.8, anchor=("foot", (45, FLOOR))),
-    front_pose((170, 20, 0.9, 0.6), (95, 92), ts=0.9, anchor=("foot", (45, FLOOR))),
-    FRONT,
-)
-F["SQUAT_FRONT"] = (
-    front_pose((80, 80, 0.4, 0.4), (95, 90), anchor=("foot", (43, FLOOR))),
-    front_pose((80, 80, 0.4, 0.4), (150, 95, 0.75, 1), ts=0.85, anchor=("foot", (37, FLOOR))),
-    FRONT,
-)
-F["PUSHUP_FRONT"] = (
-    front_pose((100, 95), (95, 90, 0.2, 0.2), ts=0.2, anchor=("hand", (36, FLOOR))),
-    front_pose((165, 70), (95, 90, 0.2, 0.2), ts=0.2, anchor=("hand", (34, FLOOR))),
-    FRONT,
-)
-F["SPLIT_FRONT"] = (
-    front_pose((95, 90), (95, 90), anchor=("foot", (44, FLOOR))),
-    front_pose((95, 90), (95, 90, 0.35, 1), leg2=(85, 90, 1, 0.25), anchor=("foot", (44, FLOOR))),
-    FRONT,
-)
-F["STEPUP_FRONT"] = (
-    front_pose((95, 90), (95, 90, 0.55, 1), leg2=(88, 90), anchor=("foot2", (55, FLOOR))),
-    front_pose((95, 90), (92, 90), anchor=("foot", (45, FLOOR - 16))),
-    [("box", 34, FLOOR - 16, 32, 16)] + FRONT,
-)
-F["BAG_FRONT"] = (
-    front_pose((100, -75), (100, 85), anchor=("foot", (40, FLOOR))),
-    front_pose((100, -75), (100, 85), arm2=(-30, -30, 0.5, 0.5), anchor=("foot", (40, FLOOR))),
-    FRONT,
-)
+# ───────────────────────────── limb specs ─────────────────────────────
 
-# Warm-up moves.
-F["WU_MARCH"] = (
-    pose(-90, (60, 20), (-5, 95), arm2=(120, 160), leg2=(90, 90), anchor=("foot2", (50, FLOOR))),
-    pose(-90, (120, 160), (90, 90), arm2=(60, 20), leg2=(-5, 95), anchor=("foot", (50, FLOOR))),
-    [],
-)
-F["WU_ARMS"] = (
-    front_pose((180, 180), (95, 90), anchor=("foot", (45, FLOOR))),
-    front_pose((-125, -125), (95, 90), anchor=("foot", (45, FLOOR))),
-    FRONT,
-)
-F["WU_HIPS"] = (
-    front_pose((130, 20, 1, 0.8), (100, 100), leg2=(100, 100), anchor=("foot", (40, FLOOR))),
-    front_pose((130, 20, 1, 0.8), (80, 80), leg2=(80, 80), anchor=("foot", (40, FLOOR))),
-    FRONT,
-)
-F["WU_HINGE"] = (
-    pose(-90, (45, -150), (90, 90), anchor=("foot", (50, FLOOR))),
-    pose(-15, (100, -60), (75, 105), anchor=("foot", (50, FLOOR))),
-    [],
-)
-F["WU_SHOULDERS"] = (
-    front_pose((92, 90), (95, 90), head=-128, anchor=("foot", (45, FLOOR))),
-    front_pose((92, 90, 0.85, 1), (95, 90), head=-52, anchor=("foot", (45, FLOOR))),
-    FRONT,
-)
+def fk(flex=0, abd=0, bend=0, out=0):
+    """Joint angles. flex: 0 hanging down, 90 forward, 180 overhead (legs: 90 = thigh forward).
+    abd: out to the side. bend: elbow or knee bend in degrees (elbows bend forward, knees back).
+    out: turns the bend direction outward, e.g. elbows flaring out."""
+    return ("fk", flex, abd, bend, out)
 
-def check():
+
+def ik(target, pole, planted=True):
+    """End point (hand or foot) at a world point; the elbow or knee bends toward the pole direction."""
+    return ("ik", np.array(target, float), np.array(pole, float), planted)
+
+
+def rel(joint, offset, pole):
+    """End point at an offset (world axes) from another joint of the same pose, e.g. hands on hips."""
+    return ("rel", joint, np.array(offset, float), np.array(pole, float))
+
+
+# ───────────────────────────── a pose ─────────────────────────────
+
+class Frame:
+    """A built pose, kept as positions and directions so poses can be blended without stretching."""
+
+    def __init__(self, pelvis, up, fwd, shrug, head_dir, face_dir, limbs, toe_dirs):
+        self.pelvis, self.up, self.fwd, self.shrug = pelvis, up, fwd, shrug
+        self.head_dir, self.face_dir = head_dir, face_dir
+        self.limbs = limbs        # name -> (upper dir, lower dir)
+        self.toe_dirs = toe_dirs  # "L"/"R" -> dir
+        self.left = unit(np.cross(up, fwd))
+
+    def roots(self):
+        neck = self.pelvis + self.up * TORSO
+        sh = self.up * self.shrug
+        return {
+            "neck": neck,
+            "shL": neck + self.left * SH + sh, "shR": neck - self.left * SH + sh,
+            "hipL": self.pelvis + self.left * HH, "hipR": self.pelvis - self.left * HH,
+        }
+
+    def joints(self):
+        j = dict(self.roots())
+        j["pelvis"] = self.pelvis
+        j["head"] = j["neck"] + self.head_dir * NECK
+        side = unit(np.cross(self.head_dir, self.face_dir))  # the head's left
+        for s, sign in (("L", 1), ("R", -1)):
+            j["eye" + s] = j["head"] + HEAD_R * 0.62 * unit(self.face_dir * 0.85 + side * 0.42 * sign + self.head_dir * 0.2)
+        for limb, root, mid, end, l1, l2 in (("armL", "shL", "elL", "haL", UPPER, FORE), ("armR", "shR", "elR", "haR", UPPER, FORE),
+                                            ("legL", "hipL", "knL", "ftL", THIGH, SHIN), ("legR", "hipR", "knR", "ftR", THIGH, SHIN)):
+            u, l = self.limbs[limb]
+            j[mid] = j[root] + u * l1
+            j[end] = j[mid] + l * l2
+        for s in "LR":
+            j["to" + s] = j["ft" + s] + self.toe_dirs[s] * FOOT
+        return j
+
+
+def two_bone(root, target, l1, l2, pole):
+    """Middle joint direction and lower direction reaching from root toward target, bending toward pole.
+    Returns (upper dir, lower dir, miss): miss is how far the end point falls short of the target."""
+    d_vec = target - root
+    d = np.linalg.norm(d_vec)
+    t = unit(d_vec)
+    reach = min(max(d, abs(l1 - l2) + 1e-3), l1 + l2 - 1e-3)
+    cos_a = (l1 * l1 + reach * reach - l2 * l2) / (2 * l1 * reach)
+    a = math.acos(max(-1, min(1, cos_a)))
+    p = pole - np.dot(pole, t) * t
+    if np.linalg.norm(p) < 1e-6:
+        p = np.cross(t, X) if abs(t[0]) < 0.9 else np.cross(t, Y)
+    p = unit(p)
+    mid = root + l1 * (math.cos(a) * t + math.sin(a) * p)
+    end = root + t * reach
+    return unit(mid - root), unit(end - mid), abs(d - reach)
+
+
+def build(spec, misses=None, tag=""):
+    """spec keys: hip (pelvis point), yaw/pitch/roll (degrees; pitch tips the body forward), shrug,
+    head (chin down +), turn (head turned to its left +), armL/armR/legL/legR (fk/ik/rel), anchor
+    (joint name, world point, axes 'xyz' to fix), feet ("flat" toward the facing direction, "shin" =
+    at right angles to the shin, or a number = degrees the heel is raised), toes (world direction)."""
+    up, fwd = Y.copy(), Z.copy()
+    p = spec.get("pitch", 0)
+    up, fwd = rot(up, X, p), rot(fwd, X, p)
+    r = spec.get("roll", 0)
+    up = rot(up, fwd, -r)
+    yaw = spec.get("yaw", 0)
+    up, fwd = rot(up, Y, yaw), rot(fwd, Y, yaw)
+    pelvis = np.array(spec.get("hip", (0, 40, 0)), float)
+    left = unit(np.cross(up, fwd))
+    head_dir = rot(up, left, spec.get("head", 0))
+    face_dir = rot(fwd, left, spec.get("head", 0))
+    turn = spec.get("turn", 0)
+    face_dir = rot(face_dir, head_dir, turn)
+    frame = Frame(pelvis, up, fwd, spec.get("shrug", 0), head_dir, face_dir, {}, {})
+
+    def fk_dirs(limb, s):
+        _, flex, abd, bend, out = s
+        arm = limb.startswith("arm")
+        sign = 1 if limb.endswith("L") else -1
+        down = -up
+        d = rot(down, left, -flex)
+        bdir = rot(fwd, left, -flex) if arm else -rot(fwd, left, -flex)
+        d = rot(d, fwd, sign * abd); bdir = rot(bdir, fwd, sign * abd)
+        bdir = rot(bdir, d, -sign * out) if arm else bdir
+        lower = unit(math.cos(math.radians(bend)) * d + math.sin(math.radians(bend)) * bdir)
+        return unit(d), lower
+
+    # Joint-angle limbs first, then move the body to its anchor, then reach for fixed points.
+    for limb in ("armL", "armR", "legL", "legR"):
+        s = spec.get(limb, fk())
+        if s[0] == "fk":
+            frame.limbs[limb] = fk_dirs(limb, s)
+        else:
+            frame.limbs[limb] = (-up, -up)  # placeholder until the anchor is known
+    set_toes(frame, spec)
+    if "anchor" in spec:
+        name, point, axes = spec["anchor"]
+        j = frame.joints()
+        delta = np.array(point, float) - j[name]
+        for i, a in enumerate("xyz"):
+            if a not in axes: delta[i] = 0
+        frame.pelvis = frame.pelvis + delta
+    roots = frame.roots()
+    roots["pelvis"] = frame.pelvis
+    for limb, root, l1, l2 in (("armL", "shL", UPPER, FORE), ("armR", "shR", UPPER, FORE),
+                               ("legL", "hipL", THIGH, SHIN), ("legR", "hipR", THIGH, SHIN)):
+        s = spec.get(limb, fk())
+        if s[0] == "ik":
+            u, l, miss = two_bone(roots[root], s[1], l1, l2, s[2])
+            frame.limbs[limb] = (u, l)
+            if misses is not None and miss > 0.6 and s[3]:
+                misses.append(f"{tag} {limb} misses its point by {miss:.1f}")
+        elif s[0] == "rel":
+            j = frame.joints()
+            u, l, miss = two_bone(roots[root], j[s[1]] + s[2], l1, l2, s[3])
+            frame.limbs[limb] = (u, l)
+            if misses is not None and miss > 0.6:
+                misses.append(f"{tag} {limb} misses {s[1]} by {miss:.1f}")
+    set_toes(frame, spec)
+    return frame
+
+
+def set_toes(frame, spec):
+    feet = spec.get("feet", "flat")
+    for s in "LR":
+        mode = spec.get("feet" + s, feet)
+        shin = frame.limbs["leg" + s][1]
+        if "toes" in spec:
+            frame.toe_dirs[s] = unit(np.array(spec["toes"], float))
+        elif mode == "line":
+            frame.toe_dirs[s] = shin
+        elif mode == "shin":
+            # At right angles to the shin, on the front side of the leg.
+            knee_fwd = frame.fwd - np.dot(frame.fwd, shin) * shin
+            frame.toe_dirs[s] = unit(knee_fwd) if np.linalg.norm(knee_fwd) > 1e-3 else unit(np.cross(frame.left, shin))
+        else:
+            raise_deg = 0 if mode == "flat" else mode
+            h = frame.fwd - np.dot(frame.fwd, Y) * Y
+            h = unit(h) if np.linalg.norm(h) > 1e-3 else unit(frame.up - np.dot(frame.up, Y) * Y)
+            h = rot(h, Y, 8 if s == "L" else -8)  # toes turned out a little
+            frame.toe_dirs[s] = unit(h * math.cos(math.radians(raise_deg)) - Y * math.sin(math.radians(raise_deg)))
+
+
+def blend(a, b, t, sa, sb, misses=None):
+    """A pose between two built poses. Directions are blended and renormalized, so lengths hold;
+    limbs planted on the same point in both poses are solved again so they stay put."""
+    def mix(u, v): return unit(u * (1 - t) + v * t) if np.linalg.norm(u * (1 - t) + v * t) > 1e-6 else u
+    up = mix(a.up, b.up)
+    fwd = mix(a.fwd, b.fwd); fwd = unit(fwd - np.dot(fwd, up) * up)
+    f = Frame(a.pelvis * (1 - t) + b.pelvis * t, up, fwd, a.shrug * (1 - t) + b.shrug * t,
+              mix(a.head_dir, b.head_dir), mix(a.face_dir, b.face_dir),
+              {k: (mix(a.limbs[k][0], b.limbs[k][0]), mix(a.limbs[k][1], b.limbs[k][1])) for k in a.limbs},
+              {k: mix(a.toe_dirs[k], b.toe_dirs[k]) for k in a.toe_dirs})
+    roots = f.roots()
+    for limb, root, l1, l2 in (("armL", "shL", UPPER, FORE), ("armR", "shR", UPPER, FORE),
+                               ("legL", "hipL", THIGH, SHIN), ("legR", "hipR", THIGH, SHIN)):
+        x, y = sa.get(limb, fk()), sb.get(limb, fk())
+        if x[0] == "ik" and y[0] == "ik" and np.allclose(x[1], y[1]):
+            u, l, _ = two_bone(roots[root], x[1], l1, l2, x[2] * (1 - t) + y[2] * t)
+            f.limbs[limb] = (u, l)
+    return f
+
+
+# ───────────────────────────── views ─────────────────────────────
+
+VIEWS = {
+    # name: (azimuth from the person's right side toward their front, elevation, label)
+    "side": (0, 0, "Side"),
+    "front": (90, 0, "Front"),
+    "back": (-90, 0, "Back"),
+    "threeq": (40, 22, "3/4 view"),
+    "threeq_low": (45, 8, "3/4 view"),
+    "above": (65, 32, "3/4 view"),
+    "high": (12, 38, "From above"),
+    "back3q": (-50, 10, "3/4 view"),
+}
+
+
+def camera(view):
+    az, el, _ = VIEWS[view]
+    a, e = math.radians(az), math.radians(el)
+    pos = np.array([-math.cos(a) * math.cos(e), math.sin(e), math.sin(a) * math.cos(e)])
+    d = -pos                                  # looking direction
+    right = unit(np.cross(d, Y))
+    upv = unit(np.cross(right, d))
+    return right, upv, d
+
+
+def project(p, cam):
+    right, upv, d = cam
+    return np.array([np.dot(p, right), np.dot(p, upv), np.dot(p, d)])
+
+
+# ───────────────────────────── props ─────────────────────────────
+
+def bar(y, z=0.0, half=30): return ("bar", np.array([-half, y, z]), np.array([half, y, z]))
+def box(x0, x1, y0, y1, z0, z1): return ("box", (x0, x1, y0, y1, z0, z1))
+def bag(x, z, r, y0, y1): return ("bag", x, z, r, y0, y1)
+def door(z, half=14, height=96, handle=(0, 45)): return ("door", z, half, height, handle)
+def tether(joint, point): return ("tether", joint, np.array(point, float))
+def mat(): return ("mat", None)
+
+
+# ───────────────────────────── the figures ─────────────────────────────
+
+FIG = {}
+
+
+def figure(name, keys, views, props=(), loop=False, steps=4, ms=None, hanging=False):
+    FIG[name] = dict(keys=keys, views=views, props=list(props), loop=loop, steps=steps, ms=ms, hanging=hanging)
+
+
+STAND = dict(hip=(0, 40, 0), armL=fk(5, 6, 12), armR=fk(5, 6, 12), anchor=("ftL", (0, 0, 0), "y"))
+
+def stand(**kw):
+    s = dict(STAND); s.update(kw); return s
+
+
+# Warm-up: marching, opposite arm and leg.
+figure("WU_MARCH", [
+    stand(legL=fk(80, 0, 90), legR=fk(0, 0, 5), armR=fk(50, 6, 70), armL=fk(-35, 6, 20), anchor=("ftR", (0, 0, 0), "y")),
+    stand(legL=fk(5, 0, 10), legR=fk(5, 0, 10), armL=fk(5, 6, 30), armR=fk(5, 6, 30), anchor=("ftR", (0, 0, 0), "y")),
+    stand(legR=fk(80, 0, 90), legL=fk(0, 0, 5), armL=fk(50, 6, 70), armR=fk(-35, 6, 20), anchor=("ftL", (0, 0, 0), "y")),
+    stand(legL=fk(5, 0, 10), legR=fk(5, 0, 10), armL=fk(5, 6, 30), armR=fk(5, 6, 30), anchor=("ftL", (0, 0, 0), "y")),
+], ["side", "front"], loop=True, ms=1600)
+
+# Warm-up: arm circles, arms out to the sides.
+def circle_arms(phase):
+    a = math.radians(phase)
+    return stand(armL=fk(25 * math.cos(a), 85 + 25 * math.sin(a), 0), armR=fk(25 * math.cos(a), 85 + 25 * math.sin(a), 0))
+figure("WU_ARMS", [circle_arms(p) for p in range(0, 360, 45)], ["front", "threeq_low"], loop=True, steps=2, ms=1400)
+
+# Warm-up: hip circles, hands on hips, feet planted.
+def hip_circle(phase):
+    a = math.radians(phase)
+    dx, dz = 4 * math.cos(a), 4 * math.sin(a)
+    return dict(hip=(dx, 39, dz), roll=-6 * math.cos(a), pitch=-6 * math.sin(a),
+                legL=ik((8, 0, 0), (0.3, 0, 1)), legR=ik((-8, 0, 0), (-0.3, 0, 1)),
+                armL=rel("hipL", (3, 3, 0), (1, 0, -1)), armR=rel("hipR", (-3, 3, 0), (-1, 0, -1)))
+figure("WU_HIPS", [hip_circle(p) for p in range(0, 360, 90)], ["front", "side"], loop=True, steps=3, ms=2000)
+
+# Warm-up: good mornings, hands behind the head, flat back.
+figure("WU_HINGE", [
+    dict(hip=(0, 39.8, 0), legL=ik((5, 0, 0), (0, 0, 1)), legR=ik((-5, 0, 0), (0, 0, 1)),
+         armL=rel("head", (3, -1, -5), (1, 0.2, 0.3)), armR=rel("head", (-3, -1, -5), (-1, 0.2, 0.3))),
+    dict(hip=(0, 37, -9), pitch=72, head=-20, legL=ik((5, 0, 0), (0, 0, 1)), legR=ik((-5, 0, 0), (0, 0, 1)),
+         armL=rel("head", (3, 3, -3), (1, 0.6, 0)), armR=rel("head", (-3, 3, -3), (-1, 0.6, 0))),
+], ["side", "front"])
+
+# Warm-up: shoulder rolls and slow neck turns.
+figure("WU_SHOULDERS", [
+    stand(shrug=4, turn=0),
+    stand(shrug=0, turn=55),
+    stand(shrug=-2, turn=0),
+    stand(shrug=0, turn=-55),
+], ["front", "side"], loop=True, steps=3, ms=3200)
+
+# ── Push ──
+def plank_line(shoulder_y, foot_y=3.0):
+    """Pitch for a straight body from the toes up to a shoulder height."""
+    return 90 - math.degrees(math.asin((shoulder_y - foot_y) / (TORSO + THIGH + SHIN)))
+
+def prone(shoulder_y, hands_x, hands_dz, pole_out, pole_back, extra=None, hands=None):
+    p = plank_line(shoulder_y)
+    s = dict(pitch=p, legL=fk(0, 2, 0), legR=fk(0, 2, 0), feet="shin", anchor=("toL", (0, 0, -40), "yz"))
+    if extra: s.update(extra)
+    f = build(s)
+    j = f.joints()
+    if hands is None:
+        hands = [(hands_x, 0, j["shL"][2] + hands_dz), (-hands_x, 0, j["shR"][2] + hands_dz)]
+    s["armL"] = ik(hands[0], (pole_out, 0.5, -pole_back))
+    s["armR"] = ik(hands[1], (-pole_out, 0.5, -pole_back))
+    return s, hands
+
+bottom, hands = prone(8, 9.5, -3, 0.8, 1)
+top, _ = prone(24, 9.5, 0, 0.8, 1, hands=hands)
+figure("PUSHUP", [top, bottom], ["side", "high"], props=[mat()])
+
+bottom, hands = prone(9, 3.5, -5, 0.1, 1)
+top, _ = prone(24, 3.5, 0, 0.1, 1, hands=hands)
+figure("CLOSE_PUSHUP", [top, bottom], ["side", "high"], props=[mat()])
+
+# Pike push-up: hips high, head goes down between the hands.
+def pike(torso_pitch, hip_flex, bend_pole):
+    """Straight legs, feet fixed; the torso tips down and the elbows bend toward the feet."""
+    return dict(pitch=torso_pitch, head=-25, legL=fk(hip_flex, 0, 0), legR=fk(hip_flex, 0, 0), toes=(0, -0.6, 1),
+                anchor=("ftL", (5, 3.6, -36), "yz"),
+                armL=ik((9, 0, 6), (0.5, 0.4, bend_pole)), armR=ik((-9, 0, 6), (-0.5, 0.4, bend_pole)))
+figure("PIKE", [
+    pike(129, 112, 0),
+    pike(139, 92, -1),
+], ["side", "high"], props=[mat()])
+
+# ── Pull (bar along the shoulders, at height 100) ──
+BAR = 100
+def hang(grip, hip_dy=0.0, shrug=0.0, legs=fk(8, 0, 25), z=0.0, pitch=0, pole=(1, -0.3, -0.3)):
+    hip_y = BAR - TORSO - 25.6 + hip_dy
+    return dict(hip=(0, hip_y, z), pitch=pitch, shrug=shrug, legL=legs, legR=legs, feet="shin",
+                armL=ik((grip, BAR, 0), pole), armR=ik((-grip, BAR, 0), (-pole[0], pole[1], pole[2])))
+
+figure("HANG", [hang(9.5, 0, 0), hang(9.5, 2.5, -2.5)], ["front", "side"], props=[bar(BAR)], hanging=True)
+
+def pull_top(grip, pole, legs=fk(15, 0, 35)):
+    return dict(hip=(0, BAR - TORSO - 7, -0.5), pitch=-7, head=-10, legL=legs, legR=legs, feet="shin",
+                armL=ik((grip, BAR, 0), pole), armR=ik((-grip, BAR, 0), (-pole[0], pole[1], pole[2])))
+figure("PULLUP", [hang(13, pole=(1, -0.2, -0.2)), pull_top(13, (1, -0.7, -0.3))],
+       ["back", "side"], props=[bar(BAR)], hanging=True)
+figure("CHINUP", [hang(6.5, pole=(0.2, -0.3, 1)), pull_top(6.5, (0.25, -0.6, 1))],
+       ["front", "side"], props=[bar(BAR)], hanging=True)
+
+figure("KNEERAISE", [
+    hang(9.5, legs=fk(5, 0, 8)),
+    dict(hang(9.5, hip_dy=1.5, pitch=-10), legL=fk(100, 0, 95), legR=fk(100, 0, 95)),
+], ["side", "front"], props=[bar(BAR)], hanging=True)
+
+# Door towel row: towel around the handle of a closed door, lean back, pull the chest to the hands.
+HANDLE = np.array([0, 45, 34.0])
+def row(pitch, hands_dist, elbows):
+    s = dict(pitch=pitch, head=-pitch * 0.3, legL=fk(0, 0, 0), legR=fk(0, 0, 0), anchor=("ftL", (5, 0, 0), "xyz"))
+    f = build(s); j = f.joints()
+    for side, sh in (("L", j["shL"]), ("R", j["shR"])):
+        toward = unit(HANDLE + np.array([2.5 if side == "L" else -2.5, 0, 0]) - sh)
+        s["arm" + side] = ik(sh + toward * hands_dist, (elbows * (1 if side == "L" else -1), -0.6, -1), planted=False)
+    return s
+figure("ROW", [row(-32, 26, 0.3), row(-22, 9, 0.8)],
+       ["side", "back"], props=[door(36), tether("haL", HANDLE), tether("haR", HANDLE)])
+
+# ── Legs ──
+FEET = [(6, 0, 0), (-6, 0, 0)]
+def squat(hip, pitch, arms):
+    return dict(hip=hip, pitch=pitch, head=-pitch * 0.4, armL=arms, armR=arms,
+                legL=ik(FEET[0], (0.35, 0, 1)), legR=ik(FEET[1], (-0.35, 0, 1)))
+figure("SQUAT", [
+    squat((0, 39.7, 0), 0, fk(5, 6, 10)),
+    squat((0, 19, -13), 38, fk(118, 6, 5)),
+], ["side", "front"])
+
+def split(hip, back_raise, arms=fk(5, 8, 10)):
+    return dict(hip=hip, armL=arms, armR=arms, feetR="flat", feetL=back_raise,
+                legR=ik((-5, 0, 14), (0, 0, 1)), legL=ik((5, 3.8, -16), (0, -0.2, 1)))
+figure("SPLIT", [split((0, 37.5, -1), 50), split((0, 21, -2), 60)], ["side", "front"])
+
+def bridge_pose(lift):
+    """On the back, shoulders on the floor; lift = degrees the torso rises from the shoulders."""
+    s = dict(pitch=-90 - lift, yaw=180, head=lift, anchor=("neck", (0, 5, 30), "yz"), toes=(0, 0, -1))
+    f = build(s); j = f.joints()
+    for side in "LR":
+        x = j["sh" + side][0]
+        s["leg" + side] = ik((np.sign(x) * 6, 0, -12.8), (0, 1, 0.2))
+        s["arm" + side] = ik((np.sign(x) * 12, 0, 12), (np.sign(x), 0.3, 0))
+    return s
+figure("BRIDGE", [bridge_pose(0), bridge_pose(18)], ["side", "high"], props=[mat()])
+
+figure("CALF", [stand(), stand(feet=55, anchor=("toL", (0, 0, 0), "y"))], ["side", "threeq_low"])
+
+BOX = box(-14, 14, 0, 16, 9, 33)
+figure("STEPUP", [
+    dict(hip=(0, 38.5, 2), pitch=10, legL=ik((5, 16, 18), (0, 0, 1)), legR=ik((-5, 0, 0), (0, 0, 1)), armL=fk(-10, 6, 20), armR=fk(30, 6, 30)),
+    dict(hip=(0, 47, 10), pitch=18, legL=ik((5, 16, 18), (0, 0, 1)), legR=ik((-5, 15, 4), (0, -0.3, 1), planted=False), armL=fk(15, 6, 20), armR=fk(5, 6, 30)),
+    dict(hip=(0, 55.8, 18), legL=ik((5, 16, 18), (0, 0, 1)), legR=ik((-5, 16, 18), (0, 0, 1)), armL=fk(5, 6, 12), armR=fk(5, 6, 12)),
+], ["side", "front"], props=[BOX])
+
+# ── Core ──
+def forearm_plank(extra=None):
+    p = plank_line(13.5)
+    s = dict(pitch=p, legL=fk(0, 2, 0), legR=fk(0, 2, 0), feet="shin", anchor=("toL", (0, 0, -40), "yz"), head=10)
+    f = build(s); j = f.joints()
+    s["armL"] = ik((4, 0, j["shL"][2] + 13), (0.1, -1, 0))
+    s["armR"] = ik((-4, 0, j["shR"][2] + 13), (-0.1, -1, 0))
+    if extra: s.update(extra)
+    return s
+figure("PLANK", [forearm_plank(), forearm_plank(dict(legR=fk(-8, 2, 0)))], ["side", "high"], props=[mat()])
+
+def side_plank(top_arm, top_leg=fk(0, 0, 0), lift=0.0):
+    # Lying on the right side, facing the front camera; the right forearm is on the floor.
+    s = dict(roll=-90 + 18 + lift, yaw=0, hip=(0, 0, 0), legL=top_leg, legR=fk(0, 0, 0), feet="shin",
+             anchor=("ftR", (-38, 1.5, 0), "xy"), armL=top_arm)
+    f = build(s); j = f.joints()
+    s["armR"] = ik((j["shR"][0] + 1, 0, j["shR"][2] + 12), (0, -1, 0))
+    return s
+figure("SIDEPLANK", [side_plank(fk(0, 8, 0)), side_plank(fk(0, 92, 0))], ["front", "above"],
+       props=[mat()])
+
+def supine(arm_l, arm_r, leg_l, leg_r):
+    return dict(pitch=-90, yaw=180, hip=(0, 5, 0), armL=arm_l, armR=arm_r, legL=leg_l, legR=leg_r, feet="shin")
+UP_ARM, OVER, TABLE, LONG = fk(90, 4, 0), fk(165, 6, 0), fk(90, 4, 90), fk(12, 4, 0)
+figure("DEADBUG", [
+    supine(UP_ARM, UP_ARM, TABLE, TABLE),
+    supine(OVER, UP_ARM, TABLE, LONG),
+    supine(UP_ARM, UP_ARM, TABLE, TABLE),
+    supine(UP_ARM, OVER, LONG, TABLE),
+], ["side", "high"], props=[mat()], loop=True, ms=3600)
+
+def quad(reach_arm=None, reach_leg=None):
+    p = 90 - math.degrees(math.asin((26 - 20) / TORSO))
+    s = dict(pitch=p, hip=(0, 20, 0), feet="line")
+    f = build(s); j = f.joints()
+    for side, sign in (("L", 1), ("R", -1)):
+        s["arm" + side] = ik((j["sh" + side][0], 0, j["sh" + side][2]), (0, 0, -1))
+        s["leg" + side] = ik((j["hip" + side][0], 1.5, j["hip" + side][2] - 19.9), (0, -1, 0))
+    if reach_arm: s[reach_arm] = fk(175, 4, 0)
+    if reach_leg: s[reach_leg] = fk(2, 2, 0)
+    return s
+figure("BIRDDOG", [quad(), quad("armL", "legR"), quad(), quad("armR", "legL")],
+       ["side", "high"], props=[mat()], loop=True, ms=4000)
+
+# ── Conditioning ──
+BAG_Z = 30
+def boxing(jab=False, cross=False):
+    s = dict(hip=(0, 38, 0), yaw=-18, head=8, feetL="flat", feetR=30,
+             legL=ik((5, 0, 9), (0.2, 0, 1)), legR=ik((-5, 2, -9), (0, 0, 1)))
+    guard_l, guard_r = (3, 67, 8), (-4, 66, 5)
+    s["armL"] = ik((2, 66, BAG_Z - 9.5) if jab else guard_l, (1, -1, -0.2), planted=False)
+    s["armR"] = ik((0, 66, BAG_Z - 9.5) if cross else guard_r, (-1, -1, -0.2), planted=False)
+    if cross:
+        s["yaw"] = 12; s["hip"] = (0, 38, 1.5)
+    return s
+figure("BAG", [boxing(), boxing(jab=True), boxing(), boxing(cross=True)],
+       ["side", "back3q"], props=[bag(0, BAG_Z, 9, 32, 92)], loop=True, ms=1800)
+
+def bear(step=0):
+    """Hands under shoulders, knees under hips and off the floor. step ±1 moves one hand and the
+    opposite foot forward."""
+    p = 90 - math.degrees(math.asin((26 - 22) / TORSO))
+    s = dict(pitch=p, hip=(0, 22, 0), head=-15, feet="shin")
+    f = build(s); j = f.joints()
+    for side, sign in (("L", 1), ("R", -1)):
+        hand_dz = 6 * step * sign
+        foot_dz = -6 * step * sign
+        s["arm" + side] = ik((j["sh" + side][0] + 1.5 * sign, 0, j["sh" + side][2] + hand_dz), (0, 0, -1), planted=False)
+        s["leg" + side] = ik((j["hip" + side][0], 5.5, j["hip" + side][2] - 15 + foot_dz), (0, -0.3, 1), planted=False)
+    return s
+figure("BEAR", [bear(0), bear(1), bear(0), bear(-1)], ["side", "high"], props=[mat()], loop=True, ms=2400)
+
+
+# ───────────────────────────── frames, fitting, checks ─────────────────────────────
+
+def frames_of(name, misses):
+    f = FIG[name]
+    keys = f["keys"]
+    built = [build(k, misses, f"{name} key {i}") for i, k in enumerate(keys)]
+    out = []
+    n = len(keys)
+    pairs = range(n) if f["loop"] else range(n - 1)
+    for i in pairs:
+        a, b = built[i], built[(i + 1) % n]
+        sa, sb = keys[i], keys[(i + 1) % n]
+        for s in range(f["steps"]):
+            t = s / f["steps"]
+            t = t * t * (3 - 2 * t)
+            out.append(blend(a, b, t, sa, sb))
+    if not f["loop"]:
+        out.append(built[-1])
+    if n == 1:
+        out = [built[0]]
+    return out
+
+
+def view_data(name, view, frames):
+    f = FIG[name]
+    cam = camera(view)
+    joints = [fr.joints() for fr in frames]
+    pts = [{k: project(v, cam) for k, v in j.items()} for j in joints]
+    props2d = []
+    for pr in f["props"]:
+        if pr[0] == "bar":
+            a, b = project(pr[1], cam), project(pr[2], cam)
+            if np.hypot(*(a - b)[:2]) < 3:
+                props2d.append(("dot", a[0], a[1], 2.0))
+            else:
+                props2d.append(("line", a[0], a[1], b[0], b[1], 2.2, False))
+        elif pr[0] == "box":
+            x0, x1, y0, y1, z0, z1 = pr[1]
+            c = [np.array([x, y, z]) for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)]
+            edges = [(i, j) for i in range(8) for j in range(i + 1, 8) if bin(i ^ j).count("1") == 1]
+            seen = set()
+            for i, j in edges:
+                a, b = project(c[i], cam), project(c[j], cam)
+                if np.hypot(*(a - b)[:2]) < 0.5: continue
+                key = tuple(np.round([a[0], a[1], b[0], b[1]], 1))
+                if key in seen: continue
+                seen.add(key)
+                props2d.append(("line", a[0], a[1], b[0], b[1], 1.0, False))
+        elif pr[0] == "bag":
+            _, x, z, r, y0, y1 = pr
+            c = project(np.array([x, (y0 + y1) / 2, z]), cam)
+            top = project(np.array([x, y1, z]), cam); bot = project(np.array([x, y0, z]), cam)
+            props2d.append(("bag", c[0] - r, top[1], 2 * r, top[1] - bot[1]))
+            chain = project(np.array([x, y1 + 12, z]), cam)
+            props2d.append(("line", top[0], top[1], chain[0], chain[1], 0.8, False))
+        elif pr[0] == "door":
+            _, z, half, height, (hx, hy) = pr
+            c = [np.array(v, float) for v in ((-half, 0, z), (half, 0, z), (half, height, z), (-half, height, z))]
+            for i in range(4):
+                a, b = project(c[i], cam), project(c[(i + 1) % 4], cam)
+                if np.hypot(*(a - b)[:2]) < 0.5:
+                    continue
+                props2d.append(("line", a[0], a[1], b[0], b[1], 1.0, False))
+            if np.hypot(*(project(c[0], cam) - project(c[1], cam))[:2]) < 0.5:
+                a, b = project(c[0], cam), project(c[3], cam)
+                props2d.append(("line", a[0], a[1], b[0], b[1], 2.0, False))
+        elif pr[0] == "tether":
+            p = project(pr[2], cam)
+            props2d.append(("tether", pr[1], p[0], p[1]))
+        elif pr[0] == "mat":
+            if pr[1] is None:
+                allj = [v for fr in frames for v in fr.joints().values()]
+                x0, x1 = min(v[0] for v in allj) - 6, max(v[0] for v in allj) + 6
+                z0, z1 = min(v[2] for v in allj) - 6, max(v[2] for v in allj) + 6
+            else:
+                x0, x1, z0, z1 = pr[1]
+            c = [np.array(v, float) for v in ((x0, 0, z0), (x1, 0, z0), (x1, 0, z1), (x0, 0, z1))]
+            for i in range(4):
+                a, b = project(c[i], cam), project(c[(i + 1) % 4], cam)
+                if np.hypot(*(a - b)[:2]) < 0.5: continue
+                props2d.append(("line", a[0], a[1], b[0], b[1], 0.7, True))
+    floor_line = VIEWS[view][1] == 0 and not f["hanging"]
+    # Fit: one scale for every frame of this view, at most life size (1 unit = 1 box unit).
+    xs, ys = [], []
+    for p in pts:
+        for k, v in p.items():
+            r = HEAD_R if k == "head" else 0
+            xs += [v[0] - r, v[0] + r]; ys += [v[1] - r, v[1] + r]
+    for pr in props2d:
+        if pr[0] == "line": xs += [pr[1], pr[3]]; ys += [pr[2], pr[4]]
+        elif pr[0] in ("dot", "tether"): xs.append(pr[-3] if pr[0] == "dot" else pr[2]); ys.append(pr[-2] if pr[0] == "dot" else pr[3])
+        elif pr[0] == "bag": xs += [pr[1], pr[1] + pr[3]]; ys += [pr[2], pr[2] - pr[4]]
+    if floor_line:
+        ys.append(0.0)
+    w, h = max(xs) - min(xs), max(ys) - min(ys)
+    s = min(1.0, 92 / w, 92 / h)
+    cx = (max(xs) + min(xs)) / 2
+    if floor_line:
+        ox, oy = 50 - cx * s, 90.0  # floor (y = 0) at 90
+        def T(x, y): return (ox + x * s, oy - y * s)
+    else:
+        cy = (max(ys) + min(ys)) / 2
+        def T(x, y): return (50 + (x - cx) * s, 52 - (y - cy) * s)
+    out_frames = []
+    for p in pts:
+        out_frames.append({k: (*T(v[0], v[1]), v[2]) for k, v in p.items()})
+    out_props = []
+    for pr in props2d:
+        if pr[0] == "line":
+            a, b = T(pr[1], pr[2]), T(pr[3], pr[4])
+            out_props.append(("line", *a, *b, pr[5], pr[6]))
+        elif pr[0] == "dot":
+            out_props.append(("dot", *T(pr[1], pr[2]), pr[3]))
+        elif pr[0] == "bag":
+            a = T(pr[1], pr[2])
+            out_props.append(("bag", a[0], a[1], pr[3] * s, pr[4] * s))
+        elif pr[0] == "tether":
+            out_props.append(("tether", pr[1], *T(pr[2], pr[3])))
+    return dict(frames=out_frames, props=out_props, floor=floor_line, scale=s, label=VIEWS[view][2],
+                loop=f["loop"], ms=f["ms"] or 1600)
+
+
+def check(name, frames):
     bad = []
-    for name, (a, b, props) in F.items():
-        for tag, p in (("start", a), ("end", b)):
-            for k, (x, y) in p.items():
-                limit = 104 if ("nofloor",) in props else FLOOR + 2
-                if not (-2 <= x <= 102 and -2 <= y <= limit):
-                    bad.append(f"{name} {tag} {k} ({x:.0f},{y:.0f})")
+    f = FIG[name]
+    for i, fr in enumerate(frames):
+        j = fr.joints()
+        low = min(v[1] for k, v in j.items() if k != "head")
+        if j["head"][1] - HEAD_R < -0.6:
+            bad.append(f"{name} frame {i}: head below the floor")
+        if low < -0.6:
+            worst = min(j, key=lambda k: j[k][1])
+            bad.append(f"{name} frame {i}: {worst} below the floor ({low:.1f})")
+        # Knees and elbows bend the natural way.
+        for s in "LR":
+            th, sh = unit(j["kn" + s] - j["hip" + s]), unit(j["ft" + s] - j["kn" + s])
+            hinge = np.cross(th, sh)
+            if np.linalg.norm(hinge) > 0.2 and np.dot(hinge, fr.left) < -0.1:
+                bad.append(f"{name} frame {i}: knee {s} bends backward")
     return bad
 
-def draw(img, ox, oy, s, p, props, color):
-    d = ImageDraw.Draw(img)
-    T = lambda q: (ox + q[0] * s, oy + q[1] * s)
-    if ("nofloor",) not in props: d.line([T((0, FLOOR)), T((100, FLOOR))], fill=(120, 120, 120), width=2)
-    for pr in props:
-        if pr[0] == "bar": d.line([T((25, pr[1])), T((75, pr[1]))], fill=(160, 160, 160), width=4)
-        if pr[0] == "box": d.rectangle([T((pr[1], pr[2])), T((pr[1] + pr[3], pr[2] + pr[4]))], outline=(160, 160, 160), width=2)
-        if pr[0] == "bag": d.rounded_rectangle([T((pr[1], pr[2])), T((pr[1] + pr[3], pr[2] + pr[4]))], 8, outline=(200, 120, 80), width=3)
-        if pr[0] == "door":
-            d.rectangle([T((pr[1], 4)), T((pr[1] + 12, FLOOR))], outline=(160, 160, 160), width=2)
-            d.line([T(p["hand"]), T((pr[1], pr[2]))], fill=(220, 200, 120), width=2)
-        if pr[0] == "wall": d.line([T((pr[1], 0)), T((pr[1], FLOOR))], fill=(160, 160, 160), width=4)
-    if ("front",) in props:
-        n, h = p["neck"], p["hip"]
-        q = {"sl": (n[0] - SH, n[1]), "sr": (n[0] + SH, n[1]), "hl": (h[0] - HH, h[1]), "hr": (h[0] + HH, h[1])}
-        q.update(p)
-        for a, b in [("sl", "sr"), ("hl", "hr"), ("neck", "hip"), ("sl", "elbow"), ("elbow", "hand"), ("sr", "elbow2"),
-                     ("elbow2", "hand2"), ("hl", "knee"), ("knee", "foot"), ("hr", "knee2"), ("knee2", "foot2")]:
-            d.line([T(q[a]), T(q[b])], fill=color, width=5)
-    else:
-        for a, b in [("neck", "hip"), ("neck", "elbow2"), ("elbow2", "hand2"), ("hip", "knee2"), ("knee2", "foot2")]:
-            d.line([T(p[a]), T(p[b])], fill=tuple(int(c * 0.6) for c in color), width=5)
-        for a, b in [("neck", "hip"), ("neck", "elbow"), ("elbow", "hand"), ("hip", "knee"), ("knee", "foot")]:
-            d.line([T(p[a]), T(p[b])], fill=color, width=5)
-    hx, hy = T(p["head"]); r = 5 * s
-    d.ellipse([hx - r, hy - r, hx + r, hy + r], outline=color, width=4)
 
-def preview(path):
-    s = 2.4; cell = int(106 * s) + 20
-    names = list(F)
-    img = Image.new("RGB", (cell * 2 * 3, cell * math.ceil(len(names) / 3)), (20, 22, 26))
-    for i, n in enumerate(names):
-        a, b, props = F[n]
-        ox = (i % 3) * cell * 2; oy = (i // 3) * cell
-        draw(img, ox + 10, oy + 10, s, a, props, (143, 180, 255))
-        draw(img, ox + cell + 10, oy + 10, s, b, props, (123, 216, 143))
-        ImageDraw.Draw(img).text((ox + 12, oy + 4), n, fill=(255, 255, 255))
+# ───────────────────────────── outputs ─────────────────────────────
+
+ORDER = ["head", "eyeL", "eyeR", "neck", "shL", "elL", "haL", "shR", "elR", "haR",
+         "pelvis", "hipL", "knL", "ftL", "toL", "hipR", "knR", "ftR", "toR"]
+
+SEGMENTS = [("neck", "head"), ("neck", "pelvis"), ("shL", "shR"), ("hipL", "hipR"), ("shL", "elL"), ("elL", "haL"), ("shR", "elR"), ("elR", "haR"),
+            ("hipL", "knL"), ("knL", "ftL"), ("ftL", "toL"), ("hipR", "knR"), ("knR", "ftR"), ("ftR", "toR")]
+
+
+def draw_pose(img, ox, oy, s, data, idx, color):
+    d = ImageDraw.Draw(img, "RGBA")
+    T = lambda x, y: (ox + x * s, oy + y * s)
+    if data["floor"]:
+        d.line([T(0, 90), T(100, 90)], fill=(110, 110, 110), width=2)
+    p = data["frames"][idx]
+    for pr in data["props"]:
+        if pr[0] == "line":
+            d.line([T(pr[1], pr[2]), T(pr[3], pr[4])], fill=(90, 96, 110) if pr[6] else (160, 160, 160), width=max(1, int(pr[5] * s)))
+        elif pr[0] == "dot":
+            x, y = T(pr[1], pr[2]); r = pr[3] * s
+            d.ellipse([x - r, y - r, x + r, y + r], fill=(170, 170, 170))
+        elif pr[0] == "bag":
+            d.rounded_rectangle([T(pr[1], pr[2]), T(pr[1] + pr[3], pr[2] + pr[4])], int(5 * s), outline=(208, 128, 80), width=3)
+        elif pr[0] == "tether":
+            d.line([T(*p[pr[1]][:2]), T(pr[2], pr[3])], fill=(220, 200, 120), width=2)
+    ref = p["pelvis"][2]
+    sc = data["scale"]
+    items = []
+    quad = [p["shL"], p["shR"], p["hipR"], p["hipL"]]
+    items.append((sum(q[2] for q in quad) / 4 + 0.01, "torso", None))
+    for a, b in SEGMENTS:
+        items.append(((p[a][2] + p[b][2]) / 2, "seg", (a, b)))
+    items.append((p["head"][2], "head", None))
+    for dep, kind, ab in sorted(items, key=lambda x: -x[0]):
+        t = max(0.0, min(1.0, (dep - ref) / 9))
+        alpha = int(255 * (1 - 0.55 * t))
+        c = color + (alpha,)
+        if kind == "torso":
+            d.polygon([T(*q[:2]) for q in quad], fill=color + (60,))
+        elif kind == "seg":
+            a, b = ab
+            wid = 3 if b.startswith("to") else 4
+            d.line([T(*p[a][:2]), T(*p[b][:2])], fill=c, width=max(2, int(wid * sc * s / 2.4 * 1.3)))
+        else:
+            hx, hy = T(*p["head"][:2]); r = HEAD_R * sc * s
+            d.ellipse([hx - r, hy - r, hx + r, hy + r], fill=(20, 22, 26, 255), outline=c, width=3)
+            for e in ("eyeL", "eyeR"):
+                if p[e][2] < p["head"][2] - 0.8:
+                    ex, ey = T(*p[e][:2])
+                    d.ellipse([ex - 2, ey - 2, ex + 2, ey + 2], fill=c)
+
+
+def sheet(path, all_views):
+    s = 2.2; cell = int(104 * s) + 16
+    rows = []
+    for name, views in all_views.items():
+        for vd in views:
+            n = len(vd["frames"])
+            idxs = sorted(set([0, n // 4, n // 2, (3 * n) // 4, n - 1])) if vd["loop"] else sorted(set([0, n // 2, n - 1]))
+            rows.append((name, vd, idxs))
+    cols = 5
+    img = Image.new("RGB", (cell * cols + 150, cell * len(rows)), (20, 22, 26))
+    d = ImageDraw.Draw(img)
+    for r, (name, vd, idxs) in enumerate(rows):
+        d.text((8, r * cell + 10), f"{name}\n{vd['label']}", fill=(255, 255, 255))
+        for c, i in enumerate(idxs):
+            draw_pose(img, 150 + c * cell + 8, r * cell + 8, s, vd, i, (143, 180, 255))
     img.save(path)
 
-def kotlin(path):
-    order = ["head", "neck", "hip", "elbow", "hand", "elbow2", "hand2", "knee", "foot", "knee2", "foot2"]
+
+def kotlin(path, all_views):
+    # Joint data goes in strings parsed on first use: as float literals it would pass the JVM's
+    # 64 KB limit for one method.
     out = ["package com.dmeltz.personalworkout.core", "",
-           "// Generated by tools/gen_figures.py. Edit the poses there and run it again.", "",
-           "object Figures {", "    val all: Map<String, Figure> = mapOf("]
-    def fmt(p): return "Pose(floatArrayOf(" + ", ".join(f"{p[k][0]:.1f}f, {p[k][1]:.1f}f" for k in order) + "))"
+           "// Generated by tools/gen_figures.py from a 3D body model. Edit the poses there and run it again.", "",
+           "object Figures {",
+           "    /** Frames separated by ';', each joint's x, y and depth separated by ','. */",
+           "    private fun frames(data: String): List<Pose> =",
+           "        data.split(';').map { f -> Pose(f.split(',').map { it.toFloat() }.toFloatArray()) }",
+           "",
+           "    val all: Map<String, Figure> by lazy {",
+           "        mapOf("]
+    def num(v):
+        t = f"{v:.1f}"
+        return "0" if t in ("0.0", "-0.0") else t.rstrip("0").rstrip(".") if "." in t else t
+    def fmt(p): return ",".join(f"{num(p[k][0])},{num(p[k][1])},{num(p[k][2])}" for k in ORDER)
     def prop(pr):
-        if pr[0] == "bar": return f"Prop.Bar({pr[1]}f)"
-        if pr[0] == "wall": return f"Prop.Wall({pr[1]}f)"
-        if pr[0] == "nofloor": return "Prop.NoFloor"
-        if pr[0] == "front": return "Prop.Front"
-        if pr[0] == "door": return f"Prop.Door({pr[1]}f, {pr[2]}f)"
-        kind = "Box" if pr[0] == "box" else "Bag"
-        return f"Prop.{kind}({pr[1]}f, {pr[2]}f, {pr[3]}f, {pr[4]}f)"
-    for n, (a, b, props) in F.items():
-        out.append(f'        "{n}" to Figure(')
-        out.append(f"            {fmt(a)},")
-        out.append(f"            {fmt(b)},")
-        out.append(f"            listOf({', '.join(prop(p) for p in props)}),")
-        out.append("        ),")
-    out += ["    )", "}", ""]
+        if pr[0] == "line": return f"Prop.Line({pr[1]:.1f}f, {pr[2]:.1f}f, {pr[3]:.1f}f, {pr[4]:.1f}f, {pr[5]:.1f}f, {str(pr[6]).lower()})"
+        if pr[0] == "dot": return f"Prop.Dot({pr[1]:.1f}f, {pr[2]:.1f}f, {pr[3]:.1f}f)"
+        if pr[0] == "bag": return f"Prop.Bag({pr[1]:.1f}f, {pr[2]:.1f}f, {pr[3]:.1f}f, {pr[4]:.1f}f)"
+        if pr[0] == "tether": return f"Prop.Tether(Pose.{JOINT_CONST[pr[1]]}, {pr[2]:.1f}f, {pr[3]:.1f}f)"
+    for name, views in all_views.items():
+        for i, vd in enumerate(views):
+            key = name if i == 0 else f"{name}_{i + 1}"
+            out.append(f'            "{key}" to Figure(')
+            out.append(f'                frames("{";".join(fmt(p) for p in vd["frames"])}"),')
+            out.append(f"                listOf({', '.join(prop(p) for p in vd['props'])}),")
+            out.append(f'                floor = {str(vd["floor"]).lower()}, scale = {vd["scale"]:.2f}f, label = "{vd["label"]}", '
+                       f'loop = {str(vd["loop"]).lower()}, durationMs = {vd["ms"]},')
+            out.append("            ),")
+    out += ["        )", "    }", "}", ""]
     open(path, "w").write("\n".join(out))
 
+
+JOINT_CONST = {"haL": "HAND_L", "haR": "HAND_R"}
+
 if __name__ == "__main__":
-    for b in check(): print("OUT OF BOX:", b)
-    preview(sys.argv[1])
-    if len(sys.argv) > 2: kotlin(sys.argv[2])
+    misses, problems, all_views = [], [], {}
+    for name in FIG:
+        frames = frames_of(name, misses)
+        problems += check(name, frames)
+        all_views[name] = [view_data(name, v, frames) for v in FIG[name]["views"]]
+    for m in misses + problems:
+        print("CHECK:", m)
+    sheet(sys.argv[1], all_views)
+    if len(sys.argv) > 2:
+        kotlin(sys.argv[2], all_views)

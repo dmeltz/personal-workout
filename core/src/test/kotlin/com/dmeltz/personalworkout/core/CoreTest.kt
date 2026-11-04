@@ -27,11 +27,13 @@ class CoreTest {
         assertEquals(Muscle.entries.toSet(), covered, "every muscle on the map is some exercise's main target")
         assertTrue(library.warmup.isNotEmpty())
         for (m in library.warmup) assertNotNull(m.figure?.let { Figures.all[it] }, "warm-up ${m.name} has no figure")
-        for (f in Figures.all.values) if (f.front) assertTrue(Prop.Front in f.props)
-        assertEquals(2, Figures.views("PULLUP").size)
-        assertTrue(Figures.views("PULLUP").first().front, "hanging exercises show the front view first")
+        for (e in library.exercises) assertEquals(2, Figures.views(e.figure).size, "${e.id} has two views")
+        for ((name, f) in Figures.all) {
+            assertTrue(f.frames.isNotEmpty(), name)
+            for (p in f.frames) assertEquals(Pose.JOINTS * 3, p.points.size, name)
+            for (pr in f.props) if (pr is Prop.Tether) assertTrue(pr.joint in 0 until Pose.JOINTS)
+        }
         assertTrue(library.safety.any { "hurt" in it })
-        for (f in Figures.all.values) assertEquals(Pose.JOINTS * 2, f.start.points.size)
     }
 
     @Test fun weekdays() {
