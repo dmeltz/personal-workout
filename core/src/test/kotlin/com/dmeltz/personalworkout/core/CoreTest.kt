@@ -28,6 +28,10 @@ class CoreTest {
         assertTrue(library.warmup.isNotEmpty())
         for (m in library.warmup) assertNotNull(m.figure?.let { Figures.all[it] }, "warm-up ${m.name} has no figure")
         for (e in library.exercises) assertEquals(2, Figures.views(e.figure).size, "${e.id} has two views")
+        for (e in library.exercises) for (i in e.variations.indices) {
+            assertNotNull(e.variations[i].figure, "${e.id} variation ${i + 1} has its own figure")
+            assertEquals(2, Figures.views(e.figureAt(i)).size, "${e.id} variation ${i + 1}: ${e.figureAt(i)} has two views")
+        }
         for ((name, f) in Figures.all) {
             assertTrue(f.frames.isNotEmpty(), name)
             for (p in f.frames) assertEquals(Pose.JOINTS * 3, p.points.size, name)

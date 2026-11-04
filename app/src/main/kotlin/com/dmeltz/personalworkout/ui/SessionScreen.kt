@@ -315,7 +315,7 @@ private fun ExerciseView(
     if (es.times == 0) PipSays(Mood.CALM, Mascot.newExercise(), size = 48.dp)
     Text(v.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
     if (v.name != ex.title) Text(ex.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.outline)
-    FigureViews(ex.figure, 190.dp)
+    ex.figureAt(es.variation).let { name -> key(name) { FigureViews(name, 190.dp) } }
     Text(v.how, style = MaterialTheme.typography.bodyLarge)
     ExerciseMuscles(ex)
     Card(Modifier.fillMaxWidth()) {
