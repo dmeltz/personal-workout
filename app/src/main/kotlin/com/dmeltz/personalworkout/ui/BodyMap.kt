@@ -11,9 +11,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -64,18 +69,66 @@ private val areas = listOf(
     Area(Muscle.FEET, true, 44f, 111.5f, 3f, 2.4f),
 )
 
+/** The six-pack blocks' corner, block size and gap, in the 100 x 120 box. */
+private const val ABS_X = 45f
+private const val ABS_Y = 39.5f
+
+/**
+ * The muscle at a point of the 100 x 120 box of the front or back view, or null. A tap a little
+ * outside an area still counts, and the closest area wins.
+ */
+private fun muscleAt(x: Float, y: Float, back: Boolean): Muscle? {
+    if (!back && x in ABS_X - 0.5f..ABS_X + 10.3f && y in ABS_Y - 0.5f..ABS_Y + 19.8f) return Muscle.ABS
+    var best: Muscle? = null
+    var bestD = 1.6f
+    for (a in areas.filter { it.back == back }) {
+        val centers = if (a.mirror) listOf(a.cx, 100f - a.cx) else listOf(a.cx)
+        for (cx in centers) {
+            val dx = (x - cx) / (a.rx + 1.5f)
+            val dy = (y - a.cy) / (a.ry + 1.5f)
+            val d = dx * dx + dy * dy
+            if (d < bestD) { bestD = d; best = a.muscle }
+        }
+    }
+    return best
+}
+
 /**
  * A front and a back body outline with each muscle area filled in its color from [colors].
- * Muscles not in the map are drawn as plain outlines.
+ * Muscles not in the map are drawn as plain outlines. With [onTap], tapping a muscle reports it
+ * (null for a tap on no muscle); the [selected] one is outlined and the others dimmed.
  */
 @Composable
-fun BodyMap(colors: Map<Muscle, Color>, modifier: Modifier = Modifier, height: Dp = 180.dp) {
+fun BodyMap(
+    colors: Map<Muscle, Color>,
+    modifier: Modifier = Modifier,
+    height: Dp = 180.dp,
+    selected: Muscle? = null,
+    onTap: ((Muscle?) -> Unit)? = null,
+) {
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Canvas(Modifier.widthIn(max = height * 1.9f).fillMaxWidth().aspectRatio(210f / 122f)) {
+        val currentOnTap by rememberUpdatedState(onTap)
+        val tap = if (onTap == null) Modifier else Modifier.pointerInput(Unit) {
+            detectTapGestures { o ->
+                val scale = minOf(size.width / 210f, size.height / 122f)
+                val oy = (size.height - 122f * scale) / 2f
+                val y = (o.y - oy) / scale - 1f
+                val front = (o.x - (size.width / 2f - 105f * scale)) / scale
+                val back = (o.x - (size.width / 2f + 5f * scale)) / scale
+                currentOnTap?.invoke(
+                    when {
+                        front in 0f..100f -> muscleAt(front, y, back = false)
+                        back in 0f..100f -> muscleAt(back, y, back = true)
+                        else -> null
+                    },
+                )
+            }
+        }
+        Canvas(Modifier.widthIn(max = height * 1.9f).fillMaxWidth().aspectRatio(210f / 122f).then(tap)) {
             val scale = minOf(size.width / 210f, size.height / 122f)
             val oy = (size.height - 122f * scale) / 2f
-            drawView(colors, back = false, ox = (size.width / 2f) - 105f * scale, oy = oy, scale = scale)
-            drawView(colors, back = true, ox = (size.width / 2f) + 5f * scale, oy = oy, scale = scale)
+            drawView(colors, back = false, ox = (size.width / 2f) - 105f * scale, oy = oy, scale = scale, selected = selected)
+            drawView(colors, back = true, ox = (size.width / 2f) + 5f * scale, oy = oy, scale = scale, selected = selected)
         }
         Row(Modifier.widthIn(max = height * 1.9f).fillMaxWidth()) {
             Text("Front", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline,
@@ -86,7 +139,7 @@ fun BodyMap(colors: Map<Muscle, Color>, modifier: Modifier = Modifier, height: D
     }
 }
 
-private fun DrawScope.drawView(colors: Map<Muscle, Color>, back: Boolean, ox: Float, oy: Float, scale: Float) {
+private fun DrawScope.drawView(colors: Map<Muscle, Color>, back: Boolean, ox: Float, oy: Float, scale: Float, selected: Muscle? = null) {
     fun p(x: Float, y: Float) = Offset(ox + x * scale, oy + (y + 1f) * scale)
     fun limb(vararg pts: Float, width: Float) {
         for (i in 0 until pts.size / 2 - 1) {
@@ -113,21 +166,28 @@ private fun DrawScope.drawView(colors: Map<Muscle, Color>, back: Boolean, ox: Fl
     drawCircle(BodyBase, 5.5f * scale, p(34f, 25f))
     drawCircle(BodyBase, 5.5f * scale, p(66f, 25f))
 
+    // With a muscle selected, the others fade so it stands out.
+    fun colorOf(m: Muscle): Color {
+        val c = colors[m] ?: MuscleIdle
+        return if (selected != null && m != selected) c.copy(alpha = c.alpha * 0.35f) else c
+    }
+    val outline = Stroke(width = 1.2f * scale)
     for (a in areas.filter { it.back == back }) {
-        val color = colors[a.muscle] ?: MuscleIdle
         val centers = if (a.mirror) listOf(a.cx, 100f - a.cx) else listOf(a.cx)
         for (cx in centers) {
-            drawOval(color, p(cx - a.rx, a.cy - a.ry), Size(a.rx * 2 * scale, a.ry * 2 * scale))
+            val topLeft = p(cx - a.rx, a.cy - a.ry)
+            val size = Size(a.rx * 2 * scale, a.ry * 2 * scale)
+            drawOval(colorOf(a.muscle), topLeft, size)
+            if (a.muscle == selected) drawOval(Color.White, topLeft, size, style = outline)
         }
     }
     if (!back) {
         // The six-pack: a column of small blocks.
-        val color = colors[Muscle.ABS] ?: MuscleIdle
         for (row in 0 until 3) for (col in 0 until 2) {
-            drawRoundRect(
-                color, p(45f + col * 5.2f, 39.5f + row * 6.6f), Size(4.6f * scale, 5.8f * scale),
-                CornerRadius(1.5f * scale),
-            )
+            val topLeft = p(ABS_X + col * 5.2f, ABS_Y + row * 6.6f)
+            val size = Size(4.6f * scale, 5.8f * scale)
+            drawRoundRect(colorOf(Muscle.ABS), topLeft, size, CornerRadius(1.5f * scale))
+            if (selected == Muscle.ABS) drawRoundRect(Color.White, topLeft, size, CornerRadius(1.5f * scale), style = outline)
         }
     }
 }
