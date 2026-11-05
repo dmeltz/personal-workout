@@ -178,14 +178,14 @@ def set_toes(frame, spec):
     for s in "LR":
         mode = spec.get("feet" + s, feet)
         shin = frame.limbs["leg" + s][1]
-        if "toes" in spec:
+        if mode in ("knee", "shin"):
+            # At right angles to the shin, on the kneecap side: the toes point the way the knee
+            # faces, so a leg lifted straight up has its toes toward the head.
+            frame.toe_dirs[s] = unit(np.cross(shin, frame.left))
+        elif "toes" in spec:
             frame.toe_dirs[s] = unit(np.array(spec["toes"], float))
         elif mode == "line":
             frame.toe_dirs[s] = shin
-        elif mode == "shin":
-            # At right angles to the shin, on the front side of the leg.
-            knee_fwd = frame.fwd - np.dot(frame.fwd, shin) * shin
-            frame.toe_dirs[s] = unit(knee_fwd) if np.linalg.norm(knee_fwd) > 1e-3 else unit(np.cross(frame.left, shin))
         else:
             raise_deg = 0 if mode == "flat" else mode
             h = frame.fwd - np.dot(frame.fwd, Y) * Y
@@ -578,7 +578,7 @@ def negative(grip, pole_top, pole_hang):
     top = pull_top(grip, pole_top)
     j = build(top).joints()
     chair_y = min(j["ftL"][1], j["ftR"][1]) - 1.5
-    bottom = hang(grip, pole=pole_hang, legs=fk(20, 0, 115))  # knees bent to clear the chair
+    bottom = dict(hang(grip, pole=pole_hang, legs=fk(20, 0, 115)), feet="knee")  # knees bent to clear the chair
     return [top, bottom], box(-14, 14, 0, chair_y, j["ftL"][2] - 9, j["ftL"][2] + 9)
 keys, chair = negative(13, (1, -0.7, -0.3), (1, -0.2, -0.2))
 figure("PULLUP_NEGATIVE", keys, ["back", "side"], props=[bar(BAR), chair], ms=4000)
@@ -586,7 +586,8 @@ keys, chair = negative(6.5, (0.25, -0.6, 1), (0.2, -0.3, 1))
 figure("CHINUP_NEGATIVE", keys, ["front", "side"], props=[bar(BAR), chair], ms=4000)
 
 def hang_legs(legs_top, pitch=-10, hip_dy=1.5):
-    return [hang(9.5, legs=fk(5, 0, 8)), dict(hang(9.5, hip_dy=hip_dy, pitch=pitch), legL=legs_top, legR=legs_top)]
+    return [dict(hang(9.5, legs=fk(5, 0, 8)), feet="knee"),
+            dict(hang(9.5, hip_dy=hip_dy, pitch=pitch), legL=legs_top, legR=legs_top, feet="knee")]
 figure("KNEE_TO_CHEST", hang_legs(fk(135, 0, 120), pitch=-22, hip_dy=4), ["side", "front"], props=[bar(BAR)], hanging=True)
 figure("LEG_RAISE", hang_legs(fk(92, 0, 0), pitch=-14), ["side", "front"], props=[bar(BAR)], hanging=True)
 
@@ -648,6 +649,7 @@ def bridge_one_leg(lift, neck=(0, 5, 30)):
     s = bridge_pose(lift)
     s["anchor"] = ("neck", neck, "yz")
     s["legL"] = fk(88, 2, 0)
+    s["feetL"] = "knee"
     return s
 figure("BRIDGE_ONE_LEG", [bridge_one_leg(0), bridge_one_leg(18)], ["side", "high"], props=[mat()])
 
@@ -658,6 +660,7 @@ def hip_thrust(lift):
     xr = j["shR"][0]
     s["legR"] = ik((np.sign(xr) * 6, 0, -16), (0, 1, 0.2))
     s["legL"] = fk(85, 2, 95)
+    s["feetL"] = "knee"
     s["armL"] = fk(160, 40, 60); s["armR"] = fk(160, 40, 60)
     return s
 figure("HIP_THRUST", [hip_thrust(-28), hip_thrust(0)], ["side", "threeq"], props=[box(-18, 18, 0, COUCH_H, 26, 46)])
