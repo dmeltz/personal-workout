@@ -49,7 +49,6 @@ fun HomeScreen(
     onStart: (Boolean) -> Unit,
     onState: (AppState) -> Unit,
     onProgress: () -> Unit,
-    onPlan: () -> Unit,
     onSettings: () -> Unit,
     onContinue: () -> Unit,
 ) {
@@ -167,10 +166,6 @@ fun HomeScreen(
             Spacer(Modifier.height(12.dp))
             OutlinedButton(onClick = onProgress, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                 Text("My progress")
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onPlan, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                Text("Next 10 days")
             }
         }
     }

@@ -29,7 +29,6 @@ import com.dmeltz.personalworkout.ui.AppTheme
 import com.dmeltz.personalworkout.ui.ExerciseScreen
 import com.dmeltz.personalworkout.ui.HomeScreen
 import com.dmeltz.personalworkout.ui.HistoryScreen
-import com.dmeltz.personalworkout.ui.PlanScreen
 import com.dmeltz.personalworkout.ui.ProgressScreen
 import com.dmeltz.personalworkout.ui.SessionScreen
 import com.dmeltz.personalworkout.ui.SettingsScreen
@@ -42,7 +41,6 @@ sealed interface Screen {
     data class Exercise(val id: String) : Screen
     data object Settings : Screen
     data object History : Screen
-    data object Plan : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -107,7 +105,6 @@ class MainActivity : ComponentActivity() {
                         },
                         onContinue = { push(Screen.Session(System.currentTimeMillis())) },
                         onProgress = { push(Screen.Progress) },
-                        onPlan = { push(Screen.Plan) },
                         onSettings = { push(Screen.Settings) },
                     )
                     is Screen.Session -> SessionScreen(
@@ -160,7 +157,6 @@ class MainActivity : ComponentActivity() {
                             onBack = ::pop,
                         )
                     }
-                    Screen.Plan -> PlanScreen(state = state, library = repo.library, onBack = ::pop)
                     Screen.Settings -> SettingsScreen(
                         state = state,
                         library = repo.library,
