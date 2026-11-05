@@ -31,13 +31,15 @@ class PlannerTest {
         assertEquals(monday + 1, Planner.nextDays(library, state, monday, 3).first().day)
     }
 
-    @Test fun everyMuscleInEveryTenDays() {
-        // With and without capoeira twice a week (Tuesday and Friday), from the very first day.
-        for (state in listOf(AppState(), AppState(capoeiraDays = (0 until 9).flatMap { listOf(monday + 7 * it + 1, monday + 7 * it + 4) }))) {
+    @Test fun everyMuscleThreeTimesInEveryTenDays() {
+        // Without capoeira, and with it on Tuesday and Friday, from the very first day.
+        val tueFri = (0 until 9).flatMap { listOf(monday + 7 * it + 1, monday + 7 * it + 4) }
+        for (state in listOf(AppState(), AppState(capoeiraDays = tueFri))) {
             val plan = Planner.nextDays(library, state, monday, 60)
             for (w in plan.windowed(10)) {
-                val worked = w.flatMap { d -> d.items.flatMap { library.exercise(it.exerciseId)!!.primary } }.toSet()
-                assertEquals(emptySet(), Muscle.entries.toSet() - worked, "days ${w.first().day - monday}-${w.last().day - monday}")
+                val hits = w.flatMap { d -> d.items.flatMap { library.exercise(it.exerciseId)!!.primary } }.groupingBy { it }.eachCount()
+                val few = Muscle.entries.filter { (hits[it] ?: 0) < 3 }
+                assertEquals(emptyList(), few, "days ${w.first().day - monday}-${w.last().day - monday}")
             }
             // Every exercise still comes around once they're all started.
             val late = plan.drop(40).flatMap { d -> d.items.map { it.exerciseId } }.toSet()

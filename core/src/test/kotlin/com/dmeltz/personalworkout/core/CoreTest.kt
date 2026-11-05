@@ -164,13 +164,11 @@ class CoreTest {
                 counts[ex(id).group] = (counts[ex(id).group] ?: 0) + 1
             }
             state = Sessions.finish(library, state, day)
-            // No main group two days running.
-            val yesterday = plan.exerciseIds.map { ex(it).group }.toSet()
-            val tomorrow = SessionBuilder.build(library, state, day + 1).exerciseIds.map { ex(it).group }.toSet()
+            // No exercise two days running.
+            val yesterday = plan.exerciseIds.toSet()
+            val tomorrow = SessionBuilder.build(library, state, day + 1).exerciseIds.toSet()
             if (!state.isRestDay(day + 1)) {
-                for (g in listOf(Group.PUSH, Group.PULL, Group.LEGS)) {
-                    assertFalse(g in yesterday && g in tomorrow, "$g on ${day} and ${day + 1}")
-                }
+                assertEquals(emptySet(), yesterday intersect tomorrow, "on ${day} and ${day + 1}")
             }
         }
         for (g in listOf(Group.PUSH, Group.PULL, Group.LEGS, Group.CORE)) {
