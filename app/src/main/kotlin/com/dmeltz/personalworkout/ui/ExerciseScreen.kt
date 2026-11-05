@@ -23,6 +23,7 @@ import com.dmeltz.personalworkout.core.AppState
 import com.dmeltz.personalworkout.core.Effort
 import com.dmeltz.personalworkout.core.Exercise
 import com.dmeltz.personalworkout.core.Figures
+import com.dmeltz.personalworkout.core.Library
 import com.dmeltz.personalworkout.core.Measure
 import com.dmeltz.personalworkout.core.Progression
 import com.dmeltz.personalworkout.core.WorkoutRecord
@@ -30,10 +31,18 @@ import com.dmeltz.personalworkout.core.views
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-/** One exercise: its ladder of variations, form cues, and history. */
+/** One exercise: how to do it, setting your level, its ladder of variations, and history. */
 @Composable
-fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRecord>, onBack: () -> Unit) {
+fun ExerciseScreen(
+    exercise: Exercise,
+    state: AppState,
+    library: Library,
+    records: List<WorkoutRecord>,
+    onState: (AppState) -> Unit,
+    onBack: () -> Unit,
+) {
     val s = state.exerciseState(exercise.id)
+    val shownVariation = s?.variation ?: state.startLevels[exercise.id]?.variation ?: exercise.start
     val color = groupColors.getValue(exercise.group)
     Page(title = exercise.title, onBack = onBack) { padding ->
         Column(
@@ -42,7 +51,19 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
         ) {
             Text(exercise.group.label, style = MaterialTheme.typography.labelLarge)
             // The figure for the variation you are on (or will start with).
-            FigureViews(exercise.figureAt(s?.variation ?: state.startLevels[exercise.id]?.variation ?: exercise.start), 170.dp)
+            FigureViews(exercise.figureAt(shownVariation), 170.dp)
+            // How to do it, right under the figure.
+            val v = exercise.variation(shownVariation)
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(v.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(v.how, style = MaterialTheme.typography.bodyMedium)
+                    Text("Form", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    (exercise.cues + v.cues).forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+                    exercise.equipment?.let { Text("Needs: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline) }
+                }
+            }
+            MyLevelCard(exercise, state, library, onState)
             ExerciseMuscles(exercise)
             if (s != null) {
                 Text(
@@ -81,8 +102,6 @@ fun ExerciseScreen(exercise: Exercise, state: AppState, records: List<WorkoutRec
                     }
                 }
             }
-            Text("Form", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            exercise.cues.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
 
             Text("Level over time", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             val byDay = records.groupBy { it.day }.map { (d, rs) -> d to rs.last().levelAfter }.sortedBy { it.first }

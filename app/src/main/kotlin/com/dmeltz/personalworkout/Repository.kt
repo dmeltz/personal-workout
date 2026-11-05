@@ -73,6 +73,19 @@ class Repository private constructor(private val context: Context) {
         tmp.renameTo(logFile)
     }
 
+    /** Removes logged exercises (matched by their time and exercise). */
+    @Synchronized
+    fun deleteRecords(gone: List<WorkoutRecord>) {
+        if (!logFile.exists() || gone.isEmpty()) return
+        val lines = logFile.readLines().filter { it.isNotBlank() }.filterNot { line ->
+            val r = runCatching { json.decodeFromString<WorkoutRecord>(line) }.getOrNull()
+            r != null && gone.any { it.timestamp == r.timestamp && it.exerciseId == r.exerciseId }
+        }
+        val tmp = File(context.filesDir, "workouts.jsonl.tmp")
+        tmp.writeText(if (lines.isEmpty()) "" else lines.joinToString("\n", postfix = "\n"))
+        tmp.renameTo(logFile)
+    }
+
     fun records(): List<WorkoutRecord> {
         if (!logFile.exists()) return emptyList()
         return logFile.readLines().filter { it.isNotBlank() }.mapNotNull {

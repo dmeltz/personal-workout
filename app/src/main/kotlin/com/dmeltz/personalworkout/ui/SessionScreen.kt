@@ -467,11 +467,8 @@ private fun ExerciseView(
     if (v.name != ex.title) Text(ex.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.outline)
     if (step == INTRO) IntroCountdown { step = 0 }
     ex.figureAt(es.variation).let { name -> key(name) { FigureViews(name, 190.dp) } }
+    // How to do it and the form cues, right under the figure.
     Text(v.how, style = MaterialTheme.typography.bodyLarge)
-    TextButton(onClick = { speak(spoken) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-        Text("🔊 Read the instructions aloud")
-    }
-    ExerciseMuscles(ex)
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Form", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
@@ -479,6 +476,10 @@ private fun ExerciseView(
             ex.equipment?.let { Text("Needs: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline) }
         }
     }
+    TextButton(onClick = { speak(spoken) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+        Text("🔊 Read the instructions aloud")
+    }
+    ExerciseMuscles(ex)
     Card(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -778,14 +779,14 @@ private fun LastTime(ex: Exercise, es: ExerciseState, previous: List<WorkoutReco
     }
 }
 
-private fun effortLabel(e: Effort) = when (e) {
+internal fun effortLabel(e: Effort) = when (e) {
     Effort.EASY -> "Easy"
     Effort.OK -> "OK"
     Effort.HARD -> "Hard"
     Effort.SKIPPED -> "Skipped"
 }
 
-private fun effortColor(e: Effort) = when (e) {
+internal fun effortColor(e: Effort) = when (e) {
     Effort.EASY -> Good
     Effort.OK -> Brand
     Effort.HARD -> Color(0xFFFFB066)
@@ -869,7 +870,7 @@ private fun DoneView(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
         )
-        logged.forEachIndexed { i, l -> key(l.ex.id) { LoggedRow(l) { sets, effort -> onCorrect(i, sets, effort) } } }
+        logged.forEachIndexed { i, l -> key(l.ex.id) { LoggedRow(l.ex, l.record) { sets, effort -> onCorrect(i, sets, effort) } } }
     }
     Spacer(Modifier.height(12.dp))
     Button(onClick = onFinish, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Finish") }
@@ -877,9 +878,7 @@ private fun DoneView(
 
 /** One logged exercise on the summary, with an editor for its sets and how it felt. */
 @Composable
-private fun LoggedRow(l: Logged, onSave: (List<Int>, Effort) -> Unit) {
-    val ex = l.ex
-    val r = l.record
+fun LoggedRow(ex: Exercise, r: WorkoutRecord, title: String = r.variation, onDelete: (() -> Unit)? = null, onSave: (List<Int>, Effort) -> Unit) {
     var editing by remember { mutableStateOf(false) }
     val sets = remember(editing) {
         mutableStateListOf<Int>().apply { addAll(r.done.ifEmpty { List(r.setsPlanned) { r.target } }) }
@@ -889,7 +888,7 @@ private fun LoggedRow(l: Logged, onSave: (List<Int>, Effort) -> Unit) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(r.variation, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                     Text(
                         if (r.effort == Effort.SKIPPED) "Skipped"
                         else r.done.joinToString(" / ") + " " + ex.unit + if (r.perSide) " per side" else "",
@@ -944,6 +943,9 @@ private fun LoggedRow(l: Logged, onSave: (List<Int>, Effort) -> Unit) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { editing = false }, modifier = Modifier.weight(1f)) { Text("Cancel") }
                     Button(onClick = { onSave(sets.toList(), effort); editing = false }, modifier = Modifier.weight(1f)) { Text("Save") }
+                }
+                if (onDelete != null) {
+                    TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) { Text("Delete this exercise from the log", color = Bad) }
                 }
             }
         }

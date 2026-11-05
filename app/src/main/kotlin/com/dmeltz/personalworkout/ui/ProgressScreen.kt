@@ -70,7 +70,7 @@ fun ProgressScreen(
     library: Library,
     onState: (AppState) -> Unit,
     onExercise: (String) -> Unit,
-    onSetLevels: () -> Unit,
+    onHistory: () -> Unit,
     onBack: () -> Unit,
 ) {
     val day = today()
@@ -79,7 +79,7 @@ fun ProgressScreen(
     Page(
         title = "My progress",
         onBack = onBack,
-        actions = { TextButton(onClick = onSetLevels) { Text("Set my levels") } },
+        actions = { TextButton(onClick = onHistory) { Text("Past workouts") } },
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
