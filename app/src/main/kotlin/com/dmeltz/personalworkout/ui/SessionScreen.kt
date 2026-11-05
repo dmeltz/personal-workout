@@ -543,10 +543,36 @@ private fun ExerciseView(
         fontWeight = FontWeight.Bold,
         color = if (step == feelStep) Good else MaterialTheme.colorScheme.onSurface,
     )
+    // Under each button, what it does to next time, worked out from the sets as logged now.
+    fun nextTime(effort: Effort): String {
+        val done = if (effort == Effort.SKIPPED) emptyList() else sets.toList()
+        val next = Progression.apply(ex, es, done, effort, es.lastDone)
+        val amount = ex.amount(next.variation, next.target)
+        return when {
+            next.variation > es.variation -> "Level up! Next: ${ex.variation(next.variation).name}, $amount"
+            next.variation < es.variation -> "Back to ${ex.variation(next.variation).name}, $amount"
+            next.target > es.target -> "Next time up to $amount"
+            next.target < es.target -> "Next time down to $amount"
+            else -> "Next time the same, $amount"
+        }
+    }
     Row(Modifier.fillMaxWidth().showWhen(step == feelStep), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        EffortButton("Easy", Good, Modifier.weight(1f)) { onLog(sets.toList(), Effort.EASY) }
-        EffortButton("OK", Brand, Modifier.weight(1f)) { onLog(sets.toList(), Effort.OK) }
-        EffortButton("Hard", Color(0xFFFFB066), Modifier.weight(1f)) { onLog(sets.toList(), Effort.HARD) }
+        for ((label, color, effort) in listOf(
+            Triple("Easy", Good, Effort.EASY),
+            Triple("OK", Brand, Effort.OK),
+            Triple("Hard", Color(0xFFFFB066), Effort.HARD),
+        )) {
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                EffortButton(label, color, Modifier.fillMaxWidth()) { onLog(sets.toList(), effort) }
+                Text(
+                    nextTime(effort),
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
     }
     if (step == feelStep) {
         Text(
@@ -558,6 +584,11 @@ private fun ExerciseView(
     OutlinedButton(onClick = { onLog(emptyList(), Effort.SKIPPED) }, modifier = Modifier.fillMaxWidth()) {
         Text("Skip / couldn't do it")
     }
+    Text(
+        "Skip: ${nextTime(Effort.SKIPPED).replaceFirstChar { it.lowercase() }}. Easy moves you up faster, OK a little, Hard keeps the target where you reached.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.outline,
+    )
     Text(
         "Stop if anything hurts. Burning muscles are fine; joint or sharp pain is not.",
         style = MaterialTheme.typography.bodySmall,
