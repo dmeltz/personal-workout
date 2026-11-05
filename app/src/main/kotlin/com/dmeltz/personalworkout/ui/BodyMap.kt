@@ -96,14 +96,14 @@ private fun muscleAt(x: Float, y: Float, back: Boolean): Muscle? {
 /**
  * A front and a back body outline with each muscle area filled in its color from [colors].
  * Muscles not in the map are drawn as plain outlines. With [onTap], tapping a muscle reports it
- * (null for a tap on no muscle); the [selected] one is outlined and the others dimmed.
+ * (null for a tap on no muscle). The [selected] muscles are outlined and the others dimmed.
  */
 @Composable
 fun BodyMap(
     colors: Map<Muscle, Color>,
     modifier: Modifier = Modifier,
     height: Dp = 180.dp,
-    selected: Muscle? = null,
+    selected: Set<Muscle> = emptySet(),
     onTap: ((Muscle?) -> Unit)? = null,
 ) {
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -139,7 +139,7 @@ fun BodyMap(
     }
 }
 
-private fun DrawScope.drawView(colors: Map<Muscle, Color>, back: Boolean, ox: Float, oy: Float, scale: Float, selected: Muscle? = null) {
+private fun DrawScope.drawView(colors: Map<Muscle, Color>, back: Boolean, ox: Float, oy: Float, scale: Float, selected: Set<Muscle> = emptySet()) {
     fun p(x: Float, y: Float) = Offset(ox + x * scale, oy + (y + 1f) * scale)
     fun limb(vararg pts: Float, width: Float) {
         for (i in 0 until pts.size / 2 - 1) {
@@ -166,10 +166,10 @@ private fun DrawScope.drawView(colors: Map<Muscle, Color>, back: Boolean, ox: Fl
     drawCircle(BodyBase, 5.5f * scale, p(34f, 25f))
     drawCircle(BodyBase, 5.5f * scale, p(66f, 25f))
 
-    // With a muscle selected, the others fade so it stands out.
+    // With muscles selected, the others fade so they stand out.
     fun colorOf(m: Muscle): Color {
         val c = colors[m] ?: MuscleIdle
-        return if (selected != null && m != selected) c.copy(alpha = c.alpha * 0.35f) else c
+        return if (selected.isNotEmpty() && m !in selected) c.copy(alpha = c.alpha * 0.35f) else c
     }
     val outline = Stroke(width = 1.2f * scale)
     for (a in areas.filter { it.back == back }) {
@@ -178,7 +178,7 @@ private fun DrawScope.drawView(colors: Map<Muscle, Color>, back: Boolean, ox: Fl
             val topLeft = p(cx - a.rx, a.cy - a.ry)
             val size = Size(a.rx * 2 * scale, a.ry * 2 * scale)
             drawOval(colorOf(a.muscle), topLeft, size)
-            if (a.muscle == selected) drawOval(Color.White, topLeft, size, style = outline)
+            if (a.muscle in selected) drawOval(Color.White, topLeft, size, style = outline)
         }
     }
     if (!back) {
@@ -187,7 +187,7 @@ private fun DrawScope.drawView(colors: Map<Muscle, Color>, back: Boolean, ox: Fl
             val topLeft = p(ABS_X + col * 5.2f, ABS_Y + row * 6.6f)
             val size = Size(4.6f * scale, 5.8f * scale)
             drawRoundRect(colorOf(Muscle.ABS), topLeft, size, CornerRadius(1.5f * scale))
-            if (selected == Muscle.ABS) drawRoundRect(Color.White, topLeft, size, CornerRadius(1.5f * scale), style = outline)
+            if (Muscle.ABS in selected) drawRoundRect(Color.White, topLeft, size, CornerRadius(1.5f * scale), style = outline)
         }
     }
 }

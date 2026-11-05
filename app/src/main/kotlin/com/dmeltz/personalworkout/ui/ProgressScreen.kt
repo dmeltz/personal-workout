@@ -3,6 +3,8 @@ package com.dmeltz.personalworkout.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -78,6 +80,14 @@ fun ProgressScreen(
     val day = today()
     val overall = Progression.overallLevel(library, state)
     val started = library.exercises.count { state.exerciseState(it.id) != null }
+    // One selection links the chart and the body map: a group lights its muscles on the map, and a
+    // muscle lights the groups that train it on the chart.
+    var selGroup by remember { mutableStateOf<Group?>(null) }
+    var selMuscle by remember { mutableStateOf<Muscle?>(null) }
+    fun pickGroup(g: Group?) { selGroup = if (g == selGroup) null else g; selMuscle = null }
+    fun pickMuscle(m: Muscle?) { selMuscle = if (m == selMuscle) null else m; selGroup = null }
+    val litGroups: Set<Group> = selGroup?.let { setOf(it) } ?: selMuscle?.let { groupsTraining(library, it) } ?: emptySet()
+    val litMuscles: Set<Muscle> = selMuscle?.let { setOf(it) } ?: selGroup?.let { musclesOf(library, it) } ?: emptySet()
     Page(
         title = "My progress",
         onBack = onBack,
@@ -108,19 +118,52 @@ fun ProgressScreen(
                                 "variation (1 = easiest) plus how far you are through that variation's range.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
+                        // Lines not in the selection fade.
+                        fun faded(c: Color, lit: Boolean) = if (litGroups.isEmpty() || lit) c else c.copy(alpha = 0.2f)
                         val series = buildList {
-                            add(LineSeries("Overall", Color.White, state.levelHistory.map { it.day to it.overall }))
+                            add(LineSeries("Overall", faded(Color.White, false), state.levelHistory.map { it.day to it.overall }))
                             for (g in Group.entries) {
                                 val pts = state.levelHistory.mapNotNull { p -> p.groups[g.name]?.let { p.day to it } }
-                                if (pts.isNotEmpty()) add(LineSeries(g.short, groupColors.getValue(g), pts))
+                                if (pts.isNotEmpty()) add(LineSeries(g.short, faded(groupColors.getValue(g), g in litGroups), pts))
                             }
                         }
                         LevelChart(series, Modifier.fillMaxWidth().height(200.dp).padding(top = 12.dp))
-                        Legend(series)
+                        // The groups, as buttons: tapping one lights its muscles on the body map.
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            for (g in Group.entries) {
+                                val lit = g in litGroups
+                                val color = groupColors.getValue(g)
+                                Text(
+                                    "● ${g.short} ${Progression.groupLevel(library, state, g)?.let { "%.1f".format(it) } ?: ""}".trim(),
+                                    color = if (litGroups.isEmpty() || lit) color else color.copy(alpha = 0.4f),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (lit) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(if (lit) color.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceContainerHighest)
+                                        .clickable { pickGroup(g) }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                )
+                            }
+                        }
+                        Text(
+                            when {
+                                selGroup != null -> "${selGroup!!.label} mainly works: ${musclesOf(library, selGroup!!).joinToString { it.label.lowercase() }}. They're lit on the body map below."
+                                selMuscle != null -> "${selMuscle!!.label} is trained by " +
+                                    litGroups.joinToString(" and ") { it.label.lowercase() }.ifEmpty { "no exercise yet" } + ". Their lines are lit above."
+                                else -> "Tap a group to see its muscles on the body map."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
                     }
                 }
             }
-            item { MuscleStatus(state, library, day) }
+            item { MuscleStatus(state, library, day, selGroup, selMuscle, litMuscles, ::pickMuscle) }
             item {
                 Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -181,6 +224,12 @@ fun ProgressScreen(
     }
 }
 
+/** The muscles a group's exercises mainly work. */
+private fun musclesOf(library: Library, g: Group): Set<Muscle> = library.inGroup(g).flatMap { it.primary }.toSet()
+
+/** The groups with an exercise that mainly works [m]. */
+private fun groupsTraining(library: Library, m: Muscle): Set<Group> = Group.entries.filter { m in musclesOf(library, it) }.toSet()
+
 private val MuscleLow = Color(0xFF2E6B57)
 private val MuscleHigh = Color(0xFF8CF5B8)
 
@@ -190,7 +239,15 @@ private fun lerp(a: Color, b: Color, t: Float) = Color(
 
 /** The whole body, each muscle colored by its level: brighter is stronger, grey is not started yet. */
 @Composable
-private fun MuscleStatus(state: AppState, library: Library, day: Day) {
+private fun MuscleStatus(
+    state: AppState,
+    library: Library,
+    day: Day,
+    selGroup: Group?,
+    selected: Muscle?,
+    lit: Set<Muscle>,
+    onPick: (Muscle?) -> Unit,
+) {
     val levels = Muscle.entries.associateWith { Progression.muscleLevel(library, state, it) }
     val known = levels.values.filterNotNull()
     val lo = known.minOrNull() ?: 0.0
@@ -198,7 +255,6 @@ private fun MuscleStatus(state: AppState, library: Library, day: Day) {
     fun colorOf(level: Double) = lerp(MuscleLow, MuscleHigh, if (hi > lo) ((level - lo) / (hi - lo)).toFloat() else 0.6f)
     val colors = levels.mapNotNull { (m, l) -> l?.let { m to colorOf(it) } }.toMap()
     // Tapping a muscle on the map or a row in the table selects it in both; tapping it again clears it.
-    var selected by remember { mutableStateOf<Muscle?>(null) }
     fun lastWorked(m: Muscle) = when (val d = Progression.muscleLastWorked(library, state, m)?.let { day - it }) {
         null -> "never"
         0L -> "today"
@@ -215,17 +271,18 @@ private fun MuscleStatus(state: AppState, library: Library, day: Day) {
             )
             Text(
                 selected?.let { m -> "${m.label}: level ${levels[m]?.let { "%.2f".format(it) } ?: "not started yet"} · last worked ${lastWorked(m)}" }
+                    ?: selGroup?.let { g -> "${g.label}: the muscles it mainly works" }
                     ?: "Tap a muscle on the map or in the table.",
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = if (selected != null) FontWeight.Bold else FontWeight.Normal,
-                color = if (selected != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                fontWeight = if (lit.isNotEmpty()) FontWeight.Bold else FontWeight.Normal,
+                color = if (lit.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
             )
             BodyMap(
                 colors,
                 Modifier.padding(vertical = 6.dp),
                 height = 200.dp,
-                selected = selected,
-                onTap = { m -> selected = if (m == null || m == selected) null else m },
+                selected = lit,
+                onTap = { m -> onPick(if (m == null) selected else m) },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LegendDot(MuscleLow, "Lowest")
@@ -235,12 +292,12 @@ private fun MuscleStatus(state: AppState, library: Library, day: Day) {
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
             for (m in Muscle.entries) {
                 val level = levels[m]
-                val isSelected = m == selected
+                val isSelected = m in lit
                 Row(
                     Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(6.dp))
                         .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                        .clickable { selected = if (isSelected) null else m }
+                        .clickable { onPick(m) }
                         .padding(horizontal = 4.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
