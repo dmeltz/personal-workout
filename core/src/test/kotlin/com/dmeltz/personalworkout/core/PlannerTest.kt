@@ -19,8 +19,8 @@ class PlannerTest {
         assertTrue(plan.filter { SessionBuilder.dayKind(state, it.day) == DayKind.REST }.all { !it.training })
         assertEquals(DayKind.CAPOEIRA, plan[1].kind)
         assertTrue(plan.filter { it.kind != DayKind.REST }.all { it.training })
-        // No legs on capoeira day or the day after.
-        for (d in plan.take(3).drop(1)) assertTrue(d.items.none { library.exercise(it.exerciseId)!!.group == Group.LEGS })
+        // No legs on capoeira day.
+        for (d in plan.subList(1, 2)) assertTrue(d.items.none { library.exercise(it.exerciseId)!!.group == Group.LEGS })
         // Targets grow when the same exercise comes back.
         val pushups = plan.flatMap { d -> d.items.filter { it.exerciseId == plan[0].items[0].exerciseId } }
         assertTrue(pushups.size >= 2 && pushups.zipWithNext().all { (a, b) -> b.variation > a.variation || b.target >= a.target })
@@ -32,14 +32,14 @@ class PlannerTest {
     }
 
     @Test fun everyMuscleThreeTimesInEveryTenDays() {
-        // Without capoeira, and with it on Tuesday and Friday, from the very first day.
-        val tueFri = (0 until 9).flatMap { listOf(monday + 7 * it + 1, monday + 7 * it + 4) }
-        for (state in listOf(AppState(), AppState(capoeiraDays = tueFri))) {
+        // Capoeira on Thursday and Sunday (the default), none, Tuesday and Thursday, and three times a week.
+        val weeks = listOf(listOf(4, 7), emptyList(), listOf(2, 4), listOf(1, 3, 5))
+        for (state in weeks.map { AppState(capoeiraWeekdays = it) }) {
             val plan = Planner.nextDays(library, state, monday, 60)
             for (w in plan.windowed(10)) {
                 val hits = w.flatMap { d -> d.items.flatMap { library.exercise(it.exerciseId)!!.primary } }.groupingBy { it }.eachCount()
                 val few = Muscle.entries.filter { (hits[it] ?: 0) < 3 }
-                assertEquals(emptyList(), few, "days ${w.first().day - monday}-${w.last().day - monday}")
+                assertEquals(emptyList(), few, "capoeira ${state.capoeiraWeekdays} days ${w.first().day - monday}-${w.last().day - monday}")
             }
             // Every exercise still comes around once they're all started.
             val late = plan.drop(40).flatMap { d -> d.items.map { it.exerciseId } }.toSet()

@@ -128,7 +128,7 @@ class CoreTest {
         val state = Sessions.setCapoeira(AppState(sessionDays = listOf(monday)), monday + 1, true)
         assertEquals(2, state.streak(monday + 1))
         assertEquals(DayKind.CAPOEIRA, SessionBuilder.dayKind(state, monday + 1))
-        assertEquals(DayKind.AFTER_CAPOEIRA, SessionBuilder.dayKind(state, monday + 2))
+        assertEquals(DayKind.NORMAL, SessionBuilder.dayKind(state, monday + 2), "the day after capoeira is a normal day")
     }
 
     @Test fun firstSessionStartsTheBasics() {
@@ -143,12 +143,10 @@ class CoreTest {
     @Test fun capoeiraDaysSkipLegs() {
         var state = Sessions.start(library, AppState(), SessionBuilder.build(library, AppState(), monday), monday)
         state = Sessions.setCapoeira(state.copy(activeSession = null), monday + 1, true)
-        for (day in listOf(monday + 1, monday + 2)) {
-            val plan = SessionBuilder.build(library, state, day)
-            val groups = plan.exerciseIds.map { ex(it).group }
-            assertFalse(Group.LEGS in groups, "legs on $day")
-            assertFalse(Group.CONDITIONING in groups)
-        }
+        val plan = SessionBuilder.build(library, state, monday + 1)
+        val groups = plan.exerciseIds.map { ex(it).group }
+        assertFalse(Group.LEGS in groups, "legs on capoeira day")
+        assertFalse(Group.CONDITIONING in groups)
     }
 
     @Test fun weekBalancesMuscleGroups() {

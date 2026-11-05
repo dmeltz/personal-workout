@@ -5,7 +5,7 @@ enum class DayKind {
     NORMAL,
     /** Capoeira today: a short upper-body and core session, and it's optional. */
     CAPOEIRA,
-    /** The day after capoeira: no legs or conditioning. */
+    /** No longer used (the day after capoeira is a normal day); kept so saved sessions still load. */
     AFTER_CAPOEIRA,
     /** A planned rest day. Training is still possible. */
     REST,
@@ -37,16 +37,15 @@ object SessionBuilder {
      */
     const val MUSCLE_EVERY = 3
 
-    /** The groups a day allows: capoeira and the day after have no legs or conditioning. */
+    /** The groups a day allows: a capoeira day has no legs or conditioning. */
     fun allowedGroups(kind: DayKind): Set<Group> = when (kind) {
-        DayKind.CAPOEIRA, DayKind.AFTER_CAPOEIRA -> setOf(Group.PUSH, Group.PULL, Group.CORE)
+        DayKind.CAPOEIRA -> setOf(Group.PUSH, Group.PULL, Group.CORE)
         else -> Group.entries.toSet()
     }
 
     fun dayKind(state: AppState, today: Day): DayKind = when {
         state.isCapoeira(today) -> DayKind.CAPOEIRA
         state.isRestDay(today) -> DayKind.REST
-        state.isCapoeira(today - 1) -> DayKind.AFTER_CAPOEIRA
         else -> DayKind.NORMAL
     }
 
@@ -61,19 +60,19 @@ object SessionBuilder {
      * in it. After that, a muscle that no started exercise mainly works gets one right away, one a
      * day; the rest join one at a time, a few days apart.
      */
-    fun newExercises(library: Library, state: AppState, today: Day): List<Exercise> {
+    fun newExercises(library: Library, state: AppState, today: Day, allowed: Set<Group> = Group.entries.toSet()): List<Exercise> {
         if (state.exercises.isEmpty()) return library.exercises.filter { it.intro == 1 }
         val lastIntroduced = state.exercises.values.maxOf { it.introducedOn }
         if (today <= lastIntroduced) return emptyList()
         val covered = library.exercises.filter { state.exerciseState(it.id) != null }.flatMap { it.primary }.toSet()
         val unstarted = library.exercises.withIndex().filter { state.exerciseState(it.value.id) == null }
-        unstarted.filter { (it.value.primary - covered).isNotEmpty() }
+        unstarted.filter { (it.value.primary - covered).isNotEmpty() && it.value.group in allowed }
             .minWithOrNull(compareBy({ it.value.intro }, { it.index }))?.let { return listOf(it.value) }
         val struggling = state.exercises.values.any { it.struggles >= STRUGGLING }
         if (today - lastIntroduced < DAYS_BETWEEN_NEW || state.sessionsCompleted < SESSIONS_BEFORE_NEW || struggling) {
             return emptyList()
         }
-        return unstarted.minWithOrNull(compareBy({ it.value.intro }, { it.index }))?.value?.let(::listOf).orEmpty()
+        return unstarted.filter { it.value.group in allowed }.minWithOrNull(compareBy({ it.value.intro }, { it.index }))?.value?.let(::listOf).orEmpty()
     }
 
     /** The last day an exercise that mainly works [m] was done, or never. */
@@ -92,7 +91,7 @@ object SessionBuilder {
         val allowed = allowedGroups(kind) - (if (light) setOf(Group.CONDITIONING) else emptySet())
         fun lastTrained(g: Group) = state.groupLastTrained[g.name] ?: Long.MIN_VALUE
         val first = state.exercises.isEmpty()
-        val starting = newExercises(library, state, today).filter { first || it.group in allowed }
+        val starting = newExercises(library, state, today, allowed)
         val todaysNew = if (first) emptyList() else starting
         fun isStarted(ex: Exercise) = state.exerciseState(ex.id) != null || ex in starting
         fun stateOf(ex: Exercise) = state.exerciseState(ex.id) ?: state.initialState(ex, today)

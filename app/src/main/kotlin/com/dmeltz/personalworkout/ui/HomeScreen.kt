@@ -101,7 +101,7 @@ fun HomeScreen(
                 Column(Modifier.weight(1f)) {
                     Text("Capoeira today", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Counts for the streak. Today's session gets short and skips legs, and so does tomorrow's.",
+                        "Counts for the streak. Today's session gets short and skips legs.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -117,7 +117,6 @@ fun HomeScreen(
                     trained -> "Today's workout is done ✓"
                     kind == DayKind.REST -> "Rest day"
                     kind == DayKind.CAPOEIRA -> "Optional short session"
-                    kind == DayKind.AFTER_CAPOEIRA -> "Upper body and core today"
                     else -> "Today's workout"
                 },
                 style = MaterialTheme.typography.titleMedium,
