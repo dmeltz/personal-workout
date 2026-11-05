@@ -30,4 +30,18 @@ class PlannerTest {
         val state = AppState(sessionDays = listOf(monday))
         assertEquals(monday + 1, Planner.nextDays(library, state, monday, 3).first().day)
     }
+
+    @Test fun everyMuscleInEveryTenDays() {
+        // With and without capoeira twice a week (Tuesday and Friday), from the very first day.
+        for (state in listOf(AppState(), AppState(capoeiraDays = (0 until 9).flatMap { listOf(monday + 7 * it + 1, monday + 7 * it + 4) }))) {
+            val plan = Planner.nextDays(library, state, monday, 60)
+            for (w in plan.windowed(10)) {
+                val worked = w.flatMap { d -> d.items.flatMap { library.exercise(it.exerciseId)!!.primary } }.toSet()
+                assertEquals(emptySet(), Muscle.entries.toSet() - worked, "days ${w.first().day - monday}-${w.last().day - monday}")
+            }
+            // Every exercise still comes around once they're all started.
+            val late = plan.drop(40).flatMap { d -> d.items.map { it.exerciseId } }.toSet()
+            assertEquals(emptySet(), library.exercises.map { it.id }.toSet() - late)
+        }
+    }
 }
