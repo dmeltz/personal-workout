@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.FileProvider
 import com.dmeltz.personalworkout.core.AppState
 import com.dmeltz.personalworkout.core.DayKind
+import com.dmeltz.personalworkout.core.History
 import com.dmeltz.personalworkout.core.SessionBuilder
 import com.dmeltz.personalworkout.core.Sessions
 import com.dmeltz.personalworkout.reminder.Reminders
@@ -27,7 +28,7 @@ import com.dmeltz.personalworkout.sync.AnswerSync
 import com.dmeltz.personalworkout.ui.AppTheme
 import com.dmeltz.personalworkout.ui.ExerciseScreen
 import com.dmeltz.personalworkout.ui.HomeScreen
-import com.dmeltz.personalworkout.ui.LevelsScreen
+import com.dmeltz.personalworkout.ui.HistoryScreen
 import com.dmeltz.personalworkout.ui.ProgressScreen
 import com.dmeltz.personalworkout.ui.SessionScreen
 import com.dmeltz.personalworkout.ui.SettingsScreen
@@ -39,7 +40,7 @@ sealed interface Screen {
     data object Progress : Screen
     data class Exercise(val id: String) : Screen
     data object Settings : Screen
-    data object Levels : Screen
+    data object History : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -124,21 +125,38 @@ class MainActivity : ComponentActivity() {
                         library = repo.library,
                         onState = ::update,
                         onExercise = { push(Screen.Exercise(it)) },
-                        onSetLevels = { push(Screen.Levels) },
+                        onHistory = { push(Screen.History) },
                         onBack = ::pop,
                     )
                     is Screen.Exercise -> ExerciseScreen(
                         exercise = repo.library.exercise(screen.id)!!,
                         state = state,
-                        records = remember(screen.id) { repo.records().filter { it.exerciseId == screen.id } },
-                        onBack = ::pop,
-                    )
-                    Screen.Levels -> LevelsScreen(
-                        state = state,
                         library = repo.library,
-                        onSave = ::update,
+                        records = remember(screen.id) { repo.records().filter { it.exerciseId == screen.id } },
+                        onState = ::update,
                         onBack = ::pop,
                     )
+                    Screen.History -> {
+                        var records by remember { mutableStateOf(repo.records()) }
+                        HistoryScreen(
+                            library = repo.library,
+                            records = records,
+                            onEdit = { r, done, effort ->
+                                val (newState, record) = History.edit(repo.library, state, records, r, done, effort)
+                                repo.replaceRecord(record)
+                                update(newState)
+                                records = repo.records()
+                            },
+                            onDelete = { gone ->
+                                val newState = History.delete(repo.library, state, records, gone)
+                                repo.deleteRecords(gone)
+                                update(newState)
+                                records = repo.records()
+                                StreakWidget.updateAll(this@MainActivity)
+                            },
+                            onBack = ::pop,
+                        )
+                    }
                     Screen.Settings -> SettingsScreen(
                         state = state,
                         library = repo.library,
