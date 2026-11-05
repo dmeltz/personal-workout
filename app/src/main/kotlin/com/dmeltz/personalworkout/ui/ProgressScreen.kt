@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -195,6 +197,14 @@ private fun MuscleStatus(state: AppState, library: Library, day: Day) {
     val hi = known.maxOrNull() ?: 0.0
     fun colorOf(level: Double) = lerp(MuscleLow, MuscleHigh, if (hi > lo) ((level - lo) / (hi - lo)).toFloat() else 0.6f)
     val colors = levels.mapNotNull { (m, l) -> l?.let { m to colorOf(it) } }.toMap()
+    // Tapping a muscle on the map or a row in the table selects it in both; tapping it again clears it.
+    var selected by remember { mutableStateOf<Muscle?>(null) }
+    fun lastWorked(m: Muscle) = when (val d = Progression.muscleLastWorked(library, state, m)?.let { day - it }) {
+        null -> "never"
+        0L -> "today"
+        1L -> "yesterday"
+        else -> "$d days ago"
+    }
     Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Body map", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -203,7 +213,20 @@ private fun MuscleStatus(state: AppState, library: Library, day: Day) {
                     "Brighter is further along; grey is not started yet.",
                 style = MaterialTheme.typography.bodySmall,
             )
-            BodyMap(colors, Modifier.padding(vertical = 6.dp), height = 200.dp)
+            Text(
+                selected?.let { m -> "${m.label}: level ${levels[m]?.let { "%.2f".format(it) } ?: "not started yet"} · last worked ${lastWorked(m)}" }
+                    ?: "Tap a muscle on the map or in the table.",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = if (selected != null) FontWeight.Bold else FontWeight.Normal,
+                color = if (selected != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+            )
+            BodyMap(
+                colors,
+                Modifier.padding(vertical = 6.dp),
+                height = 200.dp,
+                selected = selected,
+                onTap = { m -> selected = if (m == null || m == selected) null else m },
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LegendDot(MuscleLow, "Lowest")
                 LegendDot(MuscleHigh, "Highest")
@@ -212,10 +235,22 @@ private fun MuscleStatus(state: AppState, library: Library, day: Day) {
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
             for (m in Muscle.entries) {
                 val level = levels[m]
-                val last = Progression.muscleLastWorked(library, state, m)
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                val isSelected = m == selected
+                Row(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                        .clickable { selected = if (isSelected) null else m }
+                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Box(Modifier.width(10.dp).height(10.dp).background(colors[m] ?: Color(0xFF55617A), CircleShape))
-                    Text(m.label, Modifier.padding(start = 8.dp).weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        m.label,
+                        Modifier.padding(start = 8.dp).weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    )
                     Text(
                         level?.let { "%.2f".format(it) } ?: "–",
                         style = MaterialTheme.typography.bodyMedium,
@@ -224,12 +259,7 @@ private fun MuscleStatus(state: AppState, library: Library, day: Day) {
                         textAlign = TextAlign.End,
                     )
                     Text(
-                        when (val d = last?.let { day - it }) {
-                            null -> "never"
-                            0L -> "today"
-                            1L -> "yesterday"
-                            else -> "$d days ago"
-                        },
+                        lastWorked(m),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.width(92.dp),
