@@ -39,8 +39,12 @@ data class AppState(
     val exercises: Map<String, ExerciseState> = emptyMap(),
     /** Days with a finished session, ascending. */
     val sessionDays: List<Day> = emptyList(),
-    /** Days marked as capoeira days, ascending. */
+    /** Days marked as capoeira days, ascending, besides the weekly ones. */
     val capoeiraDays: List<Day> = emptyList(),
+    /** Weekly capoeira days, 1 = Monday ... 7 = Sunday. Daniel's are Thursday and Sunday. */
+    val capoeiraWeekdays: List<Int> = listOf(4, 7),
+    /** Weekly capoeira days switched off (no capoeira that week), ascending. */
+    val noCapoeiraDays: List<Day> = emptyList(),
     /** Last day each muscle group was trained, by [Group] name. */
     val groupLastTrained: Map<String, Day> = emptyMap(),
     /** Overall and per-group level at the end of each training day. */
@@ -79,7 +83,8 @@ data class AppState(
 
     fun trainedOn(day: Day): Boolean = sessionDays.binarySearch(day) >= 0
 
-    fun isCapoeira(day: Day): Boolean = capoeiraDays.binarySearch(day) >= 0
+    fun isCapoeira(day: Day): Boolean = capoeiraDays.binarySearch(day) >= 0 ||
+        (weekday(day) in capoeiraWeekdays && noCapoeiraDays.binarySearch(day) < 0)
 
     fun isRestDay(day: Day): Boolean = weekday(day) in restWeekdays
 

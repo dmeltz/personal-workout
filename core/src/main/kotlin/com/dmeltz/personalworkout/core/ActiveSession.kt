@@ -122,8 +122,12 @@ object Sessions {
         return if (session.finished) finish(library, state, session.day) else state
     }
 
-    /** Marks or unmarks [day] as a capoeira day. */
-    fun setCapoeira(state: AppState, day: Day, on: Boolean): AppState = state.copy(
-        capoeiraDays = if (on) (state.capoeiraDays + day).distinct().sorted() else state.capoeiraDays - day,
-    )
+    /** Marks or unmarks [day] as a capoeira day. On a weekly capoeira day, off means none that week. */
+    fun setCapoeira(state: AppState, day: Day, on: Boolean): AppState {
+        val weekly = weekday(day) in state.capoeiraWeekdays
+        return state.copy(
+            capoeiraDays = if (on && !weekly) (state.capoeiraDays + day).distinct().sorted() else state.capoeiraDays - day,
+            noCapoeiraDays = if (!on && weekly) (state.noCapoeiraDays + day).distinct().sorted() else state.noCapoeiraDays - day,
+        )
+    }
 }

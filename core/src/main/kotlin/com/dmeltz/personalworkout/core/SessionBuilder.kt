@@ -5,7 +5,7 @@ enum class DayKind {
     NORMAL,
     /** Capoeira today: a short upper-body and core session, and it's optional. */
     CAPOEIRA,
-    /** The day after capoeira: no legs or conditioning. */
+    /** No longer used (the day after capoeira is a normal day); kept so saved sessions still load. */
     AFTER_CAPOEIRA,
     /** A planned rest day. Training is still possible. */
     REST,
@@ -20,11 +20,10 @@ data class SessionPlan(
 )
 
 object SessionBuilder {
-    /** Exercise time, not counting the warm-up (about 2 minutes). */
+    /** Exercise time to fill with muscles that are nearly due, not counting the warm-up (about 2 minutes). Due muscles always get in. */
     const val NORMAL_SECONDS = 12 * 60
     const val LIGHT_SECONDS = 7 * 60
     const val MIN_EXERCISES = 3
-    const val MAX_EXERCISES = 7
     /** Minimum days between two new exercises, and sessions before the first one. */
     const val DAYS_BETWEEN_NEW = 3
     const val SESSIONS_BEFORE_NEW = 3
@@ -32,15 +31,21 @@ object SessionBuilder {
     const val STRUGGLING = 2
     /** Conditioning comes back after this many days. */
     const val CONDITIONING_EVERY = 3
-    /** A muscle not mainly worked for this many days goes first in its group, so none is missed. */
-    const val MUSCLE_OVERDUE = 5
+    /**
+     * Every muscle is mainly worked at least every this many days, so at least 3 times in any 10.
+     * A muscle is also done a day early when the next chance to train it comes too late.
+     */
+    const val MUSCLE_EVERY = 3
 
-    private val MAIN = listOf(Group.PUSH, Group.PULL, Group.LEGS)
+    /** The groups a day allows: a capoeira day has no legs or conditioning. */
+    fun allowedGroups(kind: DayKind): Set<Group> = when (kind) {
+        DayKind.CAPOEIRA -> setOf(Group.PUSH, Group.PULL, Group.CORE)
+        else -> Group.entries.toSet()
+    }
 
     fun dayKind(state: AppState, today: Day): DayKind = when {
         state.isCapoeira(today) -> DayKind.CAPOEIRA
         state.isRestDay(today) -> DayKind.REST
-        state.isCapoeira(today - 1) -> DayKind.AFTER_CAPOEIRA
         else -> DayKind.NORMAL
     }
 
@@ -50,26 +55,24 @@ object SessionBuilder {
         return s.sets * perSet + (s.sets - 1) * ex.rest + 30
     }
 
-    /** Exercises that start today. The first session starts every intro 1 exercise, even ones not in it. */
-    fun newExercises(library: Library, state: AppState, today: Day): List<Exercise> {
+    /**
+     * Exercises that start today. The first session starts every intro 1 exercise, even ones not
+     * in it. After that, a muscle that no started exercise mainly works gets one right away, one a
+     * day; the rest join one at a time, a few days apart.
+     */
+    fun newExercises(library: Library, state: AppState, today: Day, allowed: Set<Group> = Group.entries.toSet()): List<Exercise> {
         if (state.exercises.isEmpty()) return library.exercises.filter { it.intro == 1 }
         val lastIntroduced = state.exercises.values.maxOf { it.introducedOn }
+        if (today <= lastIntroduced) return emptyList()
+        val covered = library.exercises.filter { state.exerciseState(it.id) != null }.flatMap { it.primary }.toSet()
+        val unstarted = library.exercises.withIndex().filter { state.exerciseState(it.value.id) == null }
+        unstarted.filter { (it.value.primary - covered).isNotEmpty() && it.value.group in allowed }
+            .minWithOrNull(compareBy({ it.value.intro }, { it.index }))?.let { return listOf(it.value) }
         val struggling = state.exercises.values.any { it.struggles >= STRUGGLING }
         if (today - lastIntroduced < DAYS_BETWEEN_NEW || state.sessionsCompleted < SESSIONS_BEFORE_NEW || struggling) {
             return emptyList()
         }
-        return nextUnstarted(library, state, Group.entries.toSet())?.let(::listOf).orEmpty()
-    }
-
-    /**
-     * The next exercise to start in [groups]. One that mainly works a muscle no started exercise
-     * covers yet comes first, so every muscle gets trained as soon as possible.
-     */
-    private fun nextUnstarted(library: Library, state: AppState, groups: Set<Group>): Exercise? {
-        val covered = library.exercises.filter { state.exerciseState(it.id) != null }.flatMap { it.primary }.toSet()
-        return library.exercises.withIndex()
-            .filter { state.exerciseState(it.value.id) == null && it.value.group in groups }
-            .minWithOrNull(compareBy({ (it.value.primary - covered).isEmpty() }, { it.value.intro }, { it.index }))?.value
+        return unstarted.filter { it.value.group in allowed }.minWithOrNull(compareBy({ it.value.intro }, { it.index }))?.value?.let(::listOf).orEmpty()
     }
 
     /** The last day an exercise that mainly works [m] was done, or never. */
@@ -78,90 +81,93 @@ object SessionBuilder {
             .mapNotNull { state.exerciseState(it.id)?.lastDone?.takeIf { d -> d >= 0 } }
             .maxOrNull() ?: Long.MIN_VALUE
 
-    /** Builds today's session. [kind] can override the day's own kind, as for "train anyway" on a rest day. */
+    /**
+     * Builds today's session around the muscles: each muscle that is due (see [MUSCLE_EVERY]) gets
+     * an exercise, picking the fewest exercises that cover them all. [kind] can override the day's
+     * own kind, as for "train anyway" on a rest day.
+     */
     fun build(library: Library, state: AppState, today: Day, kind: DayKind = dayKind(state, today)): SessionPlan {
         val light = kind == DayKind.CAPOEIRA
-        val allowed = when (kind) {
-            DayKind.CAPOEIRA, DayKind.AFTER_CAPOEIRA -> setOf(Group.PUSH, Group.PULL, Group.CORE)
-            else -> Group.entries.toSet()
-        }
+        val allowed = allowedGroups(kind) - (if (light) setOf(Group.CONDITIONING) else emptySet())
         fun lastTrained(g: Group) = state.groupLastTrained[g.name] ?: Long.MIN_VALUE
-        fun rested(g: Group) = lastTrained(g) < today - 1
-        // A new exercise waits for a day when its muscles are rested.
-        val starting = newExercises(library, state, today)
-            .filter { state.exercises.isEmpty() || (it.group in allowed && (it.group !in MAIN || rested(it.group))) }
-            .toMutableList()
+        val first = state.exercises.isEmpty()
+        val starting = newExercises(library, state, today, allowed)
+        val todaysNew = if (first) emptyList() else starting
         fun isStarted(ex: Exercise) = state.exerciseState(ex.id) != null || ex in starting
         fun stateOf(ex: Exercise) = state.exerciseState(ex.id) ?: state.initialState(ex, today)
-        val todaysNew = if (state.exercises.isEmpty()) emptyList() else starting.toList()
+        fun lastDone(ex: Exercise) = state.exerciseState(ex.id)?.lastDone ?: -1L
+        val pool = library.exercises.filter { isStarted(it) && it.group in allowed }
+        val last = Muscle.entries.associateWith { lastWorked(library, state, it) }
 
-        // A muscle not mainly worked for a while is overdue. Its longest wait comes first.
-        val muscleLast = Muscle.entries.associateWith { lastWorked(library, state, it) }
-        fun overdueSince(ex: Exercise): Day =
-            ex.primary.map { muscleLast.getValue(it) }.filter { it <= today - MUSCLE_OVERDUE }.minOrNull() ?: Long.MAX_VALUE
-        fun groupOverdue(g: Group): Day = library.inGroup(g).filter { state.exerciseState(it.id) != null }
-            .minOfOrNull(::overdueSince) ?: Long.MAX_VALUE
-
-        // Main groups: overdue muscles first, then the ones rested longest, skipping any trained yesterday when possible.
-        val mains = MAIN.filter { it in allowed }
-        val restedMains = mains.filter(::rested).ifEmpty { mains }
-        val chosenMains = (todaysNew.map { it.group }.filter { it in MAIN } +
-            restedMains.sortedWith(compareBy(::groupOverdue, ::lastTrained)))
-            .distinct().take(if (light) 1 else 2)
-        val groups = buildList {
-            addAll(chosenMains)
-            if (Group.CORE in allowed && (rested(Group.CORE) || light || todaysNew.any { it.group == Group.CORE })) add(Group.CORE)
-            val conditioningDue = lastTrained(Group.CONDITIONING) <= today - CONDITIONING_EVERY
-            if (!light && Group.CONDITIONING in allowed &&
-                (conditioningDue || todaysNew.any { it.group == Group.CONDITIONING })
-            ) add(Group.CONDITIONING)
+        // The next day after today with a chance to train [m] (rest days don't count).
+        fun nextChance(m: Muscle): Day = (today + 1..today + 7).firstOrNull { d ->
+            val k = dayKind(state, d)
+            k != DayKind.REST && library.exercises.any { m in it.primary && isStarted(it) && it.group in allowedGroups(k) }
+        } ?: (today + 7)
+        fun due(m: Muscle): Boolean {
+            if (pool.none { m in it.primary }) return false
+            val l = last.getValue(m)
+            // Never worked: due, except in the first session, which is already full.
+            if (l == Long.MIN_VALUE) return !first
+            if (l >= today) return false
+            return today - l >= MUSCLE_EVERY || nextChance(m) - l > MUSCLE_EVERY
         }
-        // A chosen group with nothing started yet starts its first exercise.
-        for (g in groups) {
-            if (library.inGroup(g).none(::isStarted)) nextUnstarted(library, state, setOf(g))?.let { starting += it }
-        }
+        // Worked yesterday: better left to rest when there's a choice.
+        fun tired(ex: Exercise) = ex.primary.count { last.getValue(it) >= today - 1 }
 
-        // Within a group: new exercises first, then overdue muscles, then the one done longest ago.
-        fun candidates(g: Group) = library.inGroup(g).filter(::isStarted)
-            .sortedWith(compareBy({ state.exerciseState(it.id) != null }, ::overdueSince, { state.exerciseState(it.id)?.lastDone ?: -1L }))
-        // Overdue exercises come along even past the group's usual count.
-        val perGroup = groups.associateWith { g ->
-            val c = candidates(g)
-            val n = if (g !in MAIN) 1 else if (chosenMains.size == 1) 3 else 2
-            c.take(n) + c.drop(n).filter { overdueSince(it) != Long.MAX_VALUE }
+        val chosen = mutableListOf<Exercise>()
+        chosen += todaysNew
+        val need = Muscle.entries.filter(::due).toMutableSet()
+        need -= chosen.flatMap { it.primary }.toSet()
+        // Cover the due muscles with as few exercises as possible.
+        while (need.isNotEmpty()) {
+            val best = pool.filter { it !in chosen && it.primary.any { m -> m in need } }
+                .sortedWith(
+                    // An exercise not done for a week gets a bonus, so every exercise comes around.
+                    compareByDescending<Exercise> { it.primary.count { m -> m in need } + (if (lastDone(it) <= today - 7) 1 else 0) }
+                        .thenBy(::tired)
+                        .thenBy(::lastDone),
+                ).firstOrNull() ?: break
+            chosen += best
+            need -= best.primary.toSet()
         }
-        // Round robin across groups so the same muscles don't work twice in a row. Conditioning goes last.
-        val ordered = mutableListOf<Exercise>()
-        val queues = perGroup.filterKeys { it != Group.CONDITIONING }.values.map { it.toMutableList() }
-        while (queues.any { it.isNotEmpty() }) for (q in queues) if (q.isNotEmpty()) ordered += q.removeAt(0)
-        ordered += perGroup[Group.CONDITIONING].orEmpty()
-
-        // Too few? Fill from the other allowed groups, core first, then those rested longest.
-        val minimum = if (light) 2 else MIN_EXERCISES
-        if (ordered.size < minimum) {
-            val others = allowed.filter { it !in groups && (it != Group.CONDITIONING || !light) }
-                .sortedWith(compareBy({ it != Group.CORE }, ::lastTrained))
-            for (g in others) {
-                if (ordered.size >= minimum) break
-                ordered += candidates(g).firstOrNull() ?: continue
-            }
-        }
-
+        // Room left? Muscles rested 2 days or more go a day early, which spreads the work evenly
+        // over the days instead of every muscle falling due on the same day.
         val budget = if (light) LIGHT_SECONDS else NORMAL_SECONDS
-        val chosen = mutableSetOf<Exercise>()
-        var total = 0
-        // Picked by priority (new, then overdue muscles), done in the round-robin order.
-        for (ex in ordered.sortedBy { if (it in todaysNew) Long.MIN_VALUE else overdueSince(it) }) {
-            val t = seconds(ex, stateOf(ex))
-            // Conditioning, and every muscle, gets in at least once a week, even on a full day.
-            val conditioningOverdue = ex.group == Group.CONDITIONING && lastTrained(Group.CONDITIONING) <= today - 7
-            // (A muscle never worked yet is first in line, but doesn't make a long first session longer.)
-            val muscleOverdue = overdueSince(ex).let { it != Long.MIN_VALUE && it <= today - 7 }
-            val mustTake = ex in todaysNew || chosen.size < minimum || conditioningOverdue || muscleOverdue
-            if (!mustTake && (total + t > budget || chosen.size >= MAX_EXERCISES)) continue
-            chosen += ex; total += t
+        var total = chosen.sumOf { seconds(it, stateOf(it)) }
+        val soon = Muscle.entries.filter { m -> last.getValue(m) <= today - 2 && pool.any { m in it.primary } }.toMutableSet()
+        soon -= chosen.flatMap { it.primary }.toSet()
+        while (soon.isNotEmpty()) {
+            val best = pool.filter { it !in chosen && it.primary.any { m -> m in soon } && tired(it) == 0 }
+                .sortedWith(
+                    compareBy<Exercise> { it.primary.minOf { m -> last.getValue(m) } }
+                        .thenByDescending { it.primary.count { m -> m in soon } }
+                        .thenBy(::lastDone),
+                ).firstOrNull { total + seconds(it, stateOf(it)) <= budget } ?: break
+            chosen += best
+            total += seconds(best, stateOf(best))
+            soon -= best.primary.toSet()
         }
-        val ids = ordered.filter { it in chosen }.map { it.id }
-        return SessionPlan(kind, ids, starting.map { it.id }, (total + 119) / 60 + 2)
+        // Conditioning comes back every few days.
+        if (Group.CONDITIONING in allowed && chosen.none { it.group == Group.CONDITIONING } &&
+            lastTrained(Group.CONDITIONING) <= today - CONDITIONING_EVERY
+        ) {
+            pool.filter { it.group == Group.CONDITIONING }.minByOrNull(::lastDone)?.let { chosen += it }
+        }
+        // Too few? Add rested ones, those done longest ago first.
+        val minimum = if (light) 2 else MIN_EXERCISES
+        val rest = pool.filter { it !in chosen }.sortedWith(compareBy(::tired, ::lastDone))
+        for (ex in rest) {
+            if (chosen.size >= minimum) break
+            chosen += ex
+        }
+
+        // Round robin across groups so the same muscles don't work twice in a row. Conditioning goes last.
+        val queues = chosen.filter { it.group != Group.CONDITIONING }.groupBy { it.group }.values.map { it.toMutableList() }
+        val ordered = mutableListOf<Exercise>()
+        while (queues.any { it.isNotEmpty() }) for (q in queues) if (q.isNotEmpty()) ordered += q.removeAt(0)
+        ordered += chosen.filter { it.group == Group.CONDITIONING }
+        total = ordered.sumOf { seconds(it, stateOf(it)) }
+        return SessionPlan(kind, ordered.map { it.id }, starting.map { it.id }, (total + 119) / 60 + 2)
     }
 }

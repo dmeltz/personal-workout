@@ -128,7 +128,7 @@ class CoreTest {
         val state = Sessions.setCapoeira(AppState(sessionDays = listOf(monday)), monday + 1, true)
         assertEquals(2, state.streak(monday + 1))
         assertEquals(DayKind.CAPOEIRA, SessionBuilder.dayKind(state, monday + 1))
-        assertEquals(DayKind.AFTER_CAPOEIRA, SessionBuilder.dayKind(state, monday + 2))
+        assertEquals(DayKind.NORMAL, SessionBuilder.dayKind(state, monday + 2), "the day after capoeira is a normal day")
     }
 
     @Test fun firstSessionStartsTheBasics() {
@@ -143,12 +143,10 @@ class CoreTest {
     @Test fun capoeiraDaysSkipLegs() {
         var state = Sessions.start(library, AppState(), SessionBuilder.build(library, AppState(), monday), monday)
         state = Sessions.setCapoeira(state.copy(activeSession = null), monday + 1, true)
-        for (day in listOf(monday + 1, monday + 2)) {
-            val plan = SessionBuilder.build(library, state, day)
-            val groups = plan.exerciseIds.map { ex(it).group }
-            assertFalse(Group.LEGS in groups, "legs on $day")
-            assertFalse(Group.CONDITIONING in groups)
-        }
+        val plan = SessionBuilder.build(library, state, monday + 1)
+        val groups = plan.exerciseIds.map { ex(it).group }
+        assertFalse(Group.LEGS in groups, "legs on capoeira day")
+        assertFalse(Group.CONDITIONING in groups)
     }
 
     @Test fun weekBalancesMuscleGroups() {
@@ -164,13 +162,11 @@ class CoreTest {
                 counts[ex(id).group] = (counts[ex(id).group] ?: 0) + 1
             }
             state = Sessions.finish(library, state, day)
-            // No main group two days running.
-            val yesterday = plan.exerciseIds.map { ex(it).group }.toSet()
-            val tomorrow = SessionBuilder.build(library, state, day + 1).exerciseIds.map { ex(it).group }.toSet()
+            // No exercise two days running.
+            val yesterday = plan.exerciseIds.toSet()
+            val tomorrow = SessionBuilder.build(library, state, day + 1).exerciseIds.toSet()
             if (!state.isRestDay(day + 1)) {
-                for (g in listOf(Group.PUSH, Group.PULL, Group.LEGS)) {
-                    assertFalse(g in yesterday && g in tomorrow, "$g on ${day} and ${day + 1}")
-                }
+                assertEquals(emptySet(), yesterday intersect tomorrow, "on ${day} and ${day + 1}")
             }
         }
         for (g in listOf(Group.PUSH, Group.PULL, Group.LEGS, Group.CORE)) {
