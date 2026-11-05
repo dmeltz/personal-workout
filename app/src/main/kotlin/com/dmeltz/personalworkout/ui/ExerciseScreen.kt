@@ -14,7 +14,15 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -63,18 +71,27 @@ fun ExerciseScreen(
                     exercise.equipment?.let { Text("Needs: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline) }
                 }
             }
-            MyLevelCard(exercise, state, library, onState)
             ExerciseMuscles(exercise)
-            if (s != null) {
-                Text(
-                    "Level %.2f · now ${s.sets} × ${exercise.amount(s.variation, s.target)}".format(Progression.level(exercise, s)),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = color,
-                )
-            } else {
-                Text("Not started yet. It joins your plan in its turn.", style = MaterialTheme.typography.bodyMedium)
+            // The level line opens the window to set it by hand, so it can't change by a stray tap.
+            var settingLevel by remember { mutableStateOf(false) }
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { settingLevel = true }.padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (s != null) {
+                    Text(
+                        "Level %.2f · now ${s.sets} × ${exercise.amount(s.variation, s.target)}".format(Progression.level(exercise, s)),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = color,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Text("Not started yet. It joins your plan in its turn.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                }
+                Text("✎ Set", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             }
+            if (settingLevel) MyLevelDialog(exercise, state, library, onState) { settingLevel = false }
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) { LadderDetail(exercise, s) }
             }
