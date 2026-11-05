@@ -88,6 +88,8 @@ fun ProgressScreen(
     fun pickMuscle(m: Muscle?) { selMuscle = if (m == selMuscle) null else m; selGroup = null }
     val litGroups: Set<Group> = selGroup?.let { setOf(it) } ?: selMuscle?.let { groupsTraining(library, it) } ?: emptySet()
     val litMuscles: Set<Muscle> = selMuscle?.let { setOf(it) } ?: selGroup?.let { musclesOf(library, it) } ?: emptySet()
+    // The exercises that mainly work the chosen muscle, lit in the list at the bottom.
+    val litExercises: Set<Exercise> = selMuscle?.let { m -> library.exercises.filter { m in it.primary }.toSet() } ?: emptySet()
     Page(
         title = "My progress",
         onBack = onBack,
@@ -216,7 +218,7 @@ fun ProgressScreen(
                     }
                 }
                 items(exercises, key = { it.id }) { ex ->
-                    ExerciseRow(ex, state) { onExercise(ex.id) }
+                    ExerciseRow(ex, state, lit = ex in litExercises) { onExercise(ex.id) }
                     HorizontalDivider()
                 }
             }
@@ -270,7 +272,7 @@ private fun MuscleStatus(
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
-                selected?.let { m -> "${m.label}: level ${levels[m]?.let { "%.2f".format(it) } ?: "not started yet"} · last worked ${lastWorked(m)}" }
+                selected?.let { m -> "${m.label}: level ${levels[m]?.let { "%.2f".format(it) } ?: "not started yet"} · last worked ${lastWorked(m)}. Its exercises are lit in the list below." }
                     ?: selGroup?.let { g -> "${g.label}: the muscles it mainly works" }
                     ?: "Tap a muscle on the map or in the table.",
                 style = MaterialTheme.typography.titleSmall,
@@ -302,12 +304,19 @@ private fun MuscleStatus(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(Modifier.width(10.dp).height(10.dp).background(colors[m] ?: Color(0xFF55617A), CircleShape))
-                    Text(
-                        m.label,
-                        Modifier.padding(start = 8.dp).weight(1f),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                    )
+                    Column(Modifier.padding(start = 8.dp).weight(1f)) {
+                        Text(
+                            m.label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        )
+                        // The groups whose exercises train it, in their chart colors.
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (g in groupsTraining(library, m).sortedBy { it.ordinal }) {
+                                Text(g.short, style = MaterialTheme.typography.labelSmall, color = groupColors.getValue(g))
+                            }
+                        }
+                    }
                     Text(
                         level?.let { "%.2f".format(it) } ?: "–",
                         style = MaterialTheme.typography.bodyMedium,
@@ -329,10 +338,14 @@ private fun MuscleStatus(
 }
 
 @Composable
-private fun ExerciseRow(ex: Exercise, state: AppState, onClick: () -> Unit) {
+private fun ExerciseRow(ex: Exercise, state: AppState, lit: Boolean = false, onClick: () -> Unit) {
     val s = state.exerciseState(ex.id)
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (lit) groupColors.getValue(ex.group).copy(alpha = 0.16f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // The variation you are on (or will start with), as a small still figure.
