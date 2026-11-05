@@ -53,6 +53,9 @@ import com.dmeltz.personalworkout.core.Mascot
 import com.dmeltz.personalworkout.core.Mood
 import com.dmeltz.personalworkout.core.Muscle
 import com.dmeltz.personalworkout.core.Progression
+import com.dmeltz.personalworkout.core.Planner
+import com.dmeltz.personalworkout.core.DayKind
+import androidx.compose.ui.draw.drawBehind
 import com.dmeltz.personalworkout.today
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -165,7 +168,7 @@ fun ProgressScreen(
                     }
                 }
             }
-            item { MuscleStatus(state, library, day, selGroup, selMuscle, litMuscles, ::pickMuscle) }
+            item { MuscleStatus(state, library, day, selGroup, selMuscle, litMuscles, ::pickMuscle, onExercise) }
             item {
                 Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -249,6 +252,7 @@ private fun MuscleStatus(
     selected: Muscle?,
     lit: Set<Muscle>,
     onPick: (Muscle?) -> Unit,
+    onExercise: (String) -> Unit,
 ) {
     val levels = Muscle.entries.associateWith { Progression.muscleLevel(library, state, it) }
     val known = levels.values.filterNotNull()
@@ -289,53 +293,164 @@ private fun MuscleStatus(
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LegendDot(MuscleLow, "Lowest")
                 LegendDot(MuscleHigh, "Highest")
-                LegendDot(Color(0xFF55617A), "Not started")
+                LegendDot(NotStarted, "Not started")
             }
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
+            MuscleDayGrid(state, library, levels, colors, lit, onPick, onExercise)
+        }
+    }
+}
+
+private val RowHeight = 52.dp
+private val NameWidth = 112.dp
+private val DayWidth = 56.dp
+private val HeaderHeight = 40.dp
+private val NotStarted = Color(0xFF55617A)
+private val Missed = Color(0xFFFF8A65)
+
+/**
+ * The muscle table: one row per muscle and one column per day for the next 10 days. A cell shows
+ * the planned exercises that mainly work that muscle on that day; tap one to open it. A muscle
+ * with no exercise in the 10 days is marked, so nothing gets missed.
+ */
+@Composable
+private fun MuscleDayGrid(
+    state: AppState,
+    library: Library,
+    levels: Map<Muscle, Double?>,
+    colors: Map<Muscle, Color>,
+    lit: Set<Muscle>,
+    onPick: (Muscle?) -> Unit,
+    onExercise: (String) -> Unit,
+) {
+    val plan = remember(state) { Planner.nextDays(library, state, today(), 10) }
+    // For each muscle and day, the planned exercises that mainly work it.
+    val cells: Map<Muscle, List<List<Pair<Exercise, Planner.Item>>>> = remember(plan) {
+        Muscle.entries.associateWith { m ->
+            plan.map { d -> d.items.mapNotNull { item -> library.exercise(item.exerciseId)?.takeIf { ex -> m in ex.primary }?.let { ex -> ex to item } } }
+        }
+    }
+    val missed = Muscle.entries.filter { m -> cells.getValue(m).all { it.isEmpty() } }
+    Text(
+        "Next 10 days: tap an exercise to open it. Swipe sideways for more days. A forecast that " +
+            "assumes each planned exercise is done in full and rated OK.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.outline,
+    )
+    Text(
+        if (missed.isEmpty()) "✓ Every muscle is worked in the next 10 days."
+        else "Not worked in the next 10 days: ${missed.joinToString { it.label.lowercase() }}.",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        color = if (missed.isEmpty()) MuscleHigh else Missed,
+    )
+    val selectedBg = MaterialTheme.colorScheme.primaryContainer
+    val restBg = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
+    val line = MaterialTheme.colorScheme.outlineVariant
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        // The muscle names stay put while the days scroll.
+        Column(Modifier.width(NameWidth)) {
+            Box(Modifier.height(HeaderHeight))
             for (m in Muscle.entries) {
-                val level = levels[m]
                 val isSelected = m in lit
+                val isMissed = m in missed
                 Row(
-                    Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                    Modifier.height(RowHeight).fillMaxWidth()
+                        .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
+                        .background(if (isSelected) selectedBg else Color.Transparent)
                         .clickable { onPick(m) }
-                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                        .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(Modifier.width(10.dp).height(10.dp).background(colors[m] ?: Color(0xFF55617A), CircleShape))
-                    Column(Modifier.padding(start = 8.dp).weight(1f)) {
+                    Box(Modifier.size(10.dp).background(colors[m] ?: NotStarted, CircleShape))
+                    Column(Modifier.padding(start = 6.dp)) {
                         Text(
                             m.label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = if (isSelected || isMissed) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isMissed) Missed else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 2,
+                            lineHeight = MaterialTheme.typography.bodySmall.fontSize,
                         )
-                        // The groups whose exercises train it, in their chart colors.
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                levels[m]?.let { "%.1f".format(it) } ?: "–",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
                             for (g in groupsTraining(library, m).sortedBy { it.ordinal }) {
                                 Text(g.short, style = MaterialTheme.typography.labelSmall, color = groupColors.getValue(g))
                             }
                         }
                     }
-                    Text(
-                        level?.let { "%.2f".format(it) } ?: "–",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.width(48.dp),
-                        textAlign = TextAlign.End,
-                    )
-                    Text(
-                        lastWorked(m),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.width(92.dp),
-                        textAlign = TextAlign.End,
-                    )
+                }
+            }
+        }
+        Column(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
+            Row(Modifier.height(HeaderHeight)) {
+                for (d in plan) {
+                    val date = LocalDate.ofEpochDay(d.day)
+                    Column(
+                        Modifier.width(DayWidth).fillMaxHeight()
+                            .background(if (d.kind == DayKind.REST) restBg else Color.Transparent),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            if (d.day == today()) "Today" else date.format(weekday),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            when (d.kind) {
+                                DayKind.REST -> "Rest"
+                                DayKind.CAPOEIRA -> "Capo."
+                                else -> date.format(dayOfMonth)
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
+                }
+            }
+            for (m in Muscle.entries) {
+                val isSelected = m in lit
+                Row(
+                    Modifier.height(RowHeight)
+                        .background(if (isSelected) selectedBg else Color.Transparent)
+                        .drawBehind { drawLine(line, Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1f) },
+                ) {
+                    cells.getValue(m).forEachIndexed { i, here ->
+                        Row(
+                            Modifier.width(DayWidth).fillMaxHeight()
+                                .background(if (plan[i].kind == DayKind.REST && !isSelected) restBg else Color.Transparent),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            // One exercise fills the cell; two or more share it.
+                            val each = if (here.size <= 1) 46.dp else (DayWidth - 4.dp) / here.size.coerceAtMost(3)
+                            for ((ex, item) in here.take(3)) {
+                                Figures.views(ex.figureAt(item.variation)).firstOrNull()?.let { f ->
+                                    Box(
+                                        Modifier.size(each)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(groupColors.getValue(ex.group).copy(alpha = 0.16f))
+                                            .clickable { onExercise(ex.id) },
+                                    ) {
+                                        StickFigure(f, Modifier.fillMaxSize(), still = true)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+private val weekday = DateTimeFormatter.ofPattern("EEE")
+private val dayOfMonth = DateTimeFormatter.ofPattern("d MMM")
 
 @Composable
 private fun ExerciseRow(ex: Exercise, state: AppState, lit: Boolean = false, onClick: () -> Unit) {
