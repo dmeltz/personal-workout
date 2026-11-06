@@ -103,7 +103,7 @@ object Mascot {
             level - monthAgo.overall >= 0.1 -> " Up %.1f from a month ago.".format(level - monthAgo.overall)
             else -> " About the same as a month ago. That's fine; plateaus come and go."
         }
-        val weakest = Group.entries.filter { it != Group.CONDITIONING }
+        val weakest = Group.entries.filter { it != Group.CONDITIONING && it.strength }
             .mapNotNull { g -> Progression.groupLevel(library, state, g)?.let { g to it } }
             .minByOrNull { it.second }
         val focus = if (weakest != null) " Your weakest area is ${weakest.first.short.lowercase()}." else ""

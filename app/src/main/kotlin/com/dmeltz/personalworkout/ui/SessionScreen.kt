@@ -61,6 +61,7 @@ import com.dmeltz.personalworkout.core.AppState
 import com.dmeltz.personalworkout.core.Effort
 import com.dmeltz.personalworkout.core.Day
 import com.dmeltz.personalworkout.core.Exercise
+import com.dmeltz.personalworkout.core.Group
 import com.dmeltz.personalworkout.core.ExerciseState
 import com.dmeltz.personalworkout.core.Library
 import com.dmeltz.personalworkout.core.Mascot
@@ -308,7 +309,11 @@ private fun TodaysPlan(exercises: List<Exercise>, warmup: List<WarmupMove>, stat
             }
             PlanRow("Warm-up", "${warmup.size} moves", warmupSeconds)
             rows.forEachIndexed { i, (ex, es, seconds) ->
-                PlanRow("${i + 1}. ${ex.variation(es.variation).name}", "${es.sets} × ${ex.amount(es.variation, es.target)}", seconds)
+                if (ex.group == Group.FLEXIBILITY && rows.getOrNull(i - 1)?.first?.group != Group.FLEXIBILITY) {
+                    Text("Cooldown stretches", style = MaterialTheme.typography.labelLarge, color = groupColors.getValue(Group.FLEXIBILITY))
+                }
+                val amount = if (es.sets == 1) ex.amount(es.variation, es.target) + " hold" else "${es.sets} × ${ex.amount(es.variation, es.target)}"
+                PlanRow("${i + 1}. ${ex.variation(es.variation).name}", amount, seconds)
             }
             Text(
                 "Times include the rests between sets. Once the warm-up is done, the workout runs by itself. ⏸ at the top pauses it.",
@@ -418,7 +423,12 @@ private fun ExerciseView(
     // at this variation.
     val spoken = remember(ex.id, es.variation) { instructions(ex, es, previous.none { it.variationIndex == es.variation }) }
     LaunchedEffect(ex.id, es.variation) {
-        if (readAloud) speak((if (position > 0) "Moving to the next exercise. " else "") + spoken)
+        val intro = when {
+            ex.group == Group.FLEXIBILITY -> "Cooldown stretch. "
+            position > 0 -> "Moving to the next exercise. "
+            else -> ""
+        }
+        if (readAloud) speak(intro + spoken)
     }
     val sets = remember(ex.id) { mutableStateListOf<Int>().apply { repeat(es.sets) { add(es.target) } } }
     // The exercise runs by itself: time to read the instructions, then each set and rest in turn,
