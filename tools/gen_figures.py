@@ -802,6 +802,188 @@ figure("HS_BACK_WALL", [s], ["side", "front"], props=[wall(zh, zh + 2)])
 figure("HANDSTAND", [inverted(178.5), inverted(181.5)], ["side", "front"], props=[mat()], ms=1800)
 
 
+# ── Flexibility (cooldown stretches) ──
+# Static holds: two keys, easing into the stretch and holding a little deeper. Slow, so they read as holds.
+HOLD_MS = 5000
+
+# Standing forward fold: hinge from the hips, knees soft, hands toward the floor.
+def fold_stand(deep):
+    s = dict(hip=(0, 39 if not deep else 38, -3 if not deep else -7), pitch=55 if not deep else 118, head=-20 if not deep else -45,
+             legL=ik((5, 0, 0), (0, 0, 1)), legR=ik((-5, 0, 0), (0, 0, 1)), feet="flat")
+    j = build(s).joints()
+    if deep:
+        s["armL"] = ik((6, 2, 9), (1, 0, -1), planted=False); s["armR"] = ik((-6, 2, 9), (-1, 0, -1), planted=False)
+    else:
+        s["armL"] = ik((6, 26, 5), (1, 0, -1), planted=False); s["armR"] = ik((-6, 26, 5), (-1, 0, -1), planted=False)
+    return s
+figure("FX_FOLD", [fold_stand(False), fold_stand(True)], ["side", "front"], ms=HOLD_MS)
+
+# Seated forward fold: legs straight on the floor, reaching for the toes.
+def fold_seated(deep):
+    s = dict(hip=(0, 3.5, 0), pitch=20 if not deep else 62, head=-10 if not deep else -30, feet="knee",
+             legL=ik((5, 2, 38), (0, 1, 0)), legR=ik((-5, 2, 38), (0, 1, 0)))
+    z, y = (24, 6) if not deep else (37, 5)
+    s["armL"] = ik((5, y, z), (1, 0.3, -1), planted=False); s["armR"] = ik((-5, y, z), (-1, 0.3, -1), planted=False)
+    return s
+figure("FX_FOLD_SEATED", [fold_seated(False), fold_seated(True)], ["side", "high"], props=[mat()], ms=HOLD_MS)
+
+# Half-kneeling hip flexor stretch: right knee down, left foot forward, hips pressed forward.
+def hip_flexor(fwd, reach=False):
+    s = dict(hip=(0, 21.5 - 2 * fwd, -7 + 7 * fwd), pitch=-4 * fwd, head=0,
+             legL=ik((5, 0, 17 + 2 * fwd), (0, 0, 1)), legR=ik((-5, 1.5, -28), (0, -1, 0.1)), feetL="flat", feetR="line")
+    if reach:
+        s["armR"] = fk(172, 14, 0); s["roll"] = 10 * fwd; s["armL"] = fk(5, 8, 15)
+    else:
+        s["armL"] = fk(5, 8, 15); s["armR"] = fk(5, 8, 15)
+    return s
+figure("FX_HIPFLEX", [hip_flexor(0), hip_flexor(1)], ["side", "front"], ms=HOLD_MS)
+figure("FX_HIPFLEX_REACH", [hip_flexor(0, True), hip_flexor(1, True)], ["side", "front"], ms=HOLD_MS)
+
+# Standing side bend: feet apart, one or both arms overhead, leaning to the left.
+def side_bend(lean, both=False):
+    s = dict(hip=(-2.5 * lean, 39.6, 0), roll=26 * lean, legL=ik((7, 0, 0), (0.2, 0, 1)), legR=ik((-7, 0, 0), (-0.2, 0, 1)),
+             armR=fk(170, 12, 10), armL=fk(170, 12, 10) if both else fk(8, 10, 20))
+    return s
+figure("FX_SIDEBEND", [side_bend(0), side_bend(1)], ["front", "threeq_low"], ms=HOLD_MS)
+figure("FX_SIDEBEND_BOTH", [side_bend(0, True), side_bend(1.2, True)], ["front", "threeq_low"], ms=HOLD_MS)
+
+# Lying figure-4: on the back, right ankle over the left knee, then the left thigh pulled in.
+# (Lying on the back: head toward +z, the person's left is world -x.)
+def figure4(pull):
+    s = supine(fk(0, 15, 0), fk(0, 15, 0), fk(0, 3, 0), fk(0, 3, 0))
+    s["feetL"] = "flat" if not pull else "knee"; s["feetR"] = "knee"
+    s["legL"] = ik((-6, 1.5, -22), (0, 1, 0)) if not pull else ik((-5, 27, -9), (0, 1, 1), planted=False)
+    s["legR"] = rel("knL", (4, 2, -1), (1, 0.5, 0) if not pull else (1, 0.6, 0.6))
+    if pull:
+        k = build(s).joints()["knL"]
+        s["armL"] = ik(k + np.array([-2, -7, -4]), (-1, 0.5, 0), planted=False)
+        s["armR"] = ik(k + np.array([2, -7, -4]), (1, 0.5, 0), planted=False)
+    return s
+figure("FX_FIGURE4", [figure4(0), figure4(1)], ["side", "high"], props=[mat()], ms=HOLD_MS)
+
+# Pigeon: left shin across in front, right leg straight back, hands on the floor.
+def pigeon(fold):
+    s = dict(hip=(0, 7, 0), pitch=50 + 30 * fold, head=-10 - 20 * fold, anchor=("pelvis", (0, 7, 0), "y"),
+             legL=ik((-6, 2, 14), (1, -0.3, 0.6)), legR=ik((-5, 2, -39.6), (0, -1, 0)), feetL="line", feetR="line")
+    hz = 26 if not fold else 40
+    s["armL"] = ik((9, 0.5, hz), (1, 0, -1)); s["armR"] = ik((-9, 0.5, hz), (-1, 0, -1))
+    return s
+figure("FX_PIGEON", [pigeon(0), pigeon(1)], ["side", "threeq"], props=[mat()], ms=HOLD_MS)
+
+# Deep squat hold: heels down, chest up, elbows pushing the knees out.
+def deep_squat(arms_up=False, sink=0):
+    s = dict(hip=(0, 9.5 - sink, -9), pitch=30, head=-15,
+             legL=ik((7, 0, 0), (0.55, 0, 1)), legR=ik((-7, 0, 0), (-0.55, 0, 1)))
+    if arms_up:
+        s["armL"] = fk(195, 12, 0); s["armR"] = fk(195, 12, 0)
+    else:
+        s["armL"] = rel("neck", (1.5, -12, 9), (1, -0.5, 0), ); s["armR"] = rel("neck", (-1.5, -12, 9), (-1, -0.5, 0))
+    return s
+figure("FX_DEEP_SQUAT", [deep_squat(), deep_squat(sink=1.5)], ["side", "front"], ms=HOLD_MS)
+figure("FX_DEEP_SQUAT_ARMS", [deep_squat(True), deep_squat(True, 1.5)], ["side", "front"], ms=HOLD_MS)
+
+# Chest opener: hands clasped behind the back, then lifted away, chest up.
+def chest_clasp(lift):
+    s = stand(head=-8 * lift)
+    s["armL"] = ik((1.5, 33 + 9 * lift, -8 - 9 * lift), (1, -0.6, 0), planted=False)
+    s["armR"] = ik((-1.5, 33 + 9 * lift, -8 - 9 * lift), (-1, -0.6, 0), planted=False)
+    return s
+figure("FX_CHEST", [chest_clasp(0), chest_clasp(1)], ["side", "back3q"], ms=HOLD_MS)
+
+# Puppy pose: hips over the knees, arms long on the floor ahead, chest sinking down.
+def puppy(sink):
+    p = 100 + 15 * sink
+    s = dict(pitch=p, hip=(0, 20, 0), head=-10, feet="line")
+    j = build(s).joints()
+    for side, sign in (("L", 1), ("R", -1)):
+        s["leg" + side] = ik((j["hip" + side][0], 1.5, j["hip" + side][2] - 19.9), (0, -1, 0))
+        s["arm" + side] = ik((sign * 6, 0.5, j["sh" + side][2] + 21), (sign * 0.3, 1, 0))
+    return s
+figure("FX_PUPPY", [puppy(0), puppy(1)], ["side", "high"], props=[mat()], ms=HOLD_MS)
+
+# Thread the needle: on all fours. Open: the right arm reaches to the ceiling. Thread: it slides
+# under the left arm, right shoulder down.
+def thread(open_up):
+    s = quad()
+    if open_up:
+        s["roll"] = -22; s["armR"] = fk(-80, 0, 0); s["head"] = -20
+    else:
+        s["roll"] = 30
+        j = build(s).joints()
+        s["armR"] = ik((j["shL"][0] + 6, 1, j["shL"][2] - 1), (0, 1, 0), planted=False)
+    j = build(s).joints()
+    s["armL"] = ik((j["shL"][0], 0, j["shL"][2] + 1), (0, 0, -1))
+    return s
+figure("FX_THREAD_OPEN", [quad(), thread(True)], ["side", "back3q"], props=[mat()], ms=HOLD_MS)
+figure("FX_THREAD", [quad(), thread(False)], ["side", "back3q"], props=[mat()], ms=HOLD_MS)
+
+# Wall calf stretch: hands on the wall, right leg back with the heel down (straight or bent knee).
+WALL_Z = 26
+def calf_wall(bent, lean):
+    s = dict(hip=(0, 37 - 5 * bent, -6 + 2 * bent + 2 * lean), pitch=12 + 6 * lean, head=-5,
+             legL=ik((5, 0, 8), (0, 0, 1)), legR=ik((-5, 0, -22 + 8 * bent), (0, 0, 1)), feet="flat")
+    s["armL"] = ik((7, 55, WALL_Z - 1), (1, -1, 0)); s["armR"] = ik((-7, 55, WALL_Z - 1), (-1, -1, 0))
+    return s
+figure("FX_CALF", [calf_wall(0, 0), calf_wall(0, 1)], ["side", "threeq_low"], props=[wall(WALL_Z, WALL_Z + 2, 90)], ms=HOLD_MS)
+figure("FX_CALF_BENT", [calf_wall(1, 0), calf_wall(1, 1)], ["side", "threeq_low"], props=[wall(WALL_Z, WALL_Z + 2, 90)], ms=HOLD_MS)
+
+# Cat-cow: on all fours, hands and knees planted. Cat: back rounded up, chin in. Cow: chest
+# forward, head up.
+_q = build(quad()).joints()
+def cat_cow(cat):
+    s = dict(quad())
+    s["pitch"] = s["pitch"] + (-1.5 if cat else 2)
+    s["head"] = 40 if cat else -35
+    for side in "LR":
+        s["arm" + side] = ik(_q["ha" + side], (0, 0, -1))
+        s["leg" + side] = ik(_q["ft" + side], (0, -1, 0))
+    return s
+figure("FX_CATCOW", [cat_cow(True), cat_cow(False)], ["side", "threeq"], props=[mat()], loop=True, ms=6000)
+alias("FX_CATCOW_SLOW", "FX_CATCOW", 10000)
+
+# Knees to chest: on the back, hugging both knees in.
+def knees_chest(pull):
+    s = supine(fk(0, 15, 0), fk(0, 15, 0), fk(0, 3, 0), fk(0, 3, 0))
+    s["feet"] = "knee"
+    a = (22, -14) if not pull else (26, -8)
+    s["legL"] = ik((-5, a[0], a[1]), (0, 1, 0.8), planted=False); s["legR"] = ik((5, a[0], a[1]), (0, 1, 0.8), planted=False)
+    j = build(s).joints()
+    s["armL"] = ik(j["knL"] + np.array([0, -1, -1]), (-1, 0.4, 0), planted=False)
+    s["armR"] = ik(j["knR"] + np.array([0, -1, -1]), (1, 0.4, 0), planted=False)
+    return s
+figure("FX_KNEES_CHEST", [knees_chest(0), knees_chest(1)], ["side", "high"], props=[mat()], ms=HOLD_MS)
+
+# Child's pose: kneeling, hips back toward the heels, arms long ahead, forehead down.
+def child(sink):
+    s = dict(pitch=108 + 2 * sink, hip=(0, 15.8 - 0.5 * sink, -14 - sink), head=-20, feet="line")
+    for side, sign in (("L", 1), ("R", -1)):
+        s["leg" + side] = ik((sign * 5, 1.5, -20), (0, -0.6, 1))
+    j = build(s).joints()
+    for side, sign in (("L", 1), ("R", -1)):
+        s["arm" + side] = ik((sign * 6, 0.5, j["sh" + side][2] + 23), (sign * 0.3, 1, 0))
+    return s
+figure("FX_CHILD", [child(0), child(1)], ["side", "high"], props=[mat()], ms=HOLD_MS)
+
+# Lying twist, arms out on the floor. Knee drop: both knees bent and lowered to the left. Cross-over:
+# left leg long, right knee pulled across to the left by the left hand.
+ARMS_OUT = fk(0, 85, 0)
+def twist(drop, cross=False):
+    s = supine(ARMS_OUT, ARMS_OUT, fk(0, 3, 0), fk(0, 3, 0))
+    s["feet"] = "knee"
+    if cross:
+        s["legR"] = ik((-3 - 8 * drop, 6 + 6 * (1 - drop), -16), (-1 * drop, 1, 0.5), planted=False)
+        if drop: s["armL"] = ik(build(s).joints()["knR"] + np.array([0, 1.5, 0]), (-1, 0.4, 0), planted=False)
+    else:
+        if drop:
+            s["legL"] = ik((-9, 2, -22), (-1, 0.35, 0)); s["legR"] = ik((-3, 6, -23), (-1, 0.45, 0))
+        else:
+            s["legL"] = ik((-6, 1.5, -24), (0, 1, 0)); s["legR"] = ik((6, 1.5, -24), (0, 1, 0))
+    s["turn"] = 60 * drop
+    return s
+figure("FX_TWIST_KNEES", [twist(0), twist(1)], ["high", "front"], props=[mat()], ms=HOLD_MS)
+figure("FX_TWIST", [twist(0, True), twist(1, True)], ["high", "front"], props=[mat()], ms=HOLD_MS)
+
+
 # ───────────────────────────── frames, fitting, checks ─────────────────────────────
 
 def frames_of(name, misses):

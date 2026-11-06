@@ -459,6 +459,212 @@ figure: BEAR
 variation: Lateral bear crawl | 15-45 | Crawl sideways, both directions.
 figure: BEAR_LATERAL
 
+// ───────────────────────────── FLEXIBILITY ─────────────────────────────
+// Cooldown stretches: two at the end of every workout, one of them for the lower back and pelvis
+// ("focus: lower back"). One slow hold, breathing out into the stretch. Holds grow by time, then
+// move to a deeper version.
+
+@exercise CAT_COW
+title: Cat-cow
+group: flexibility
+measure: seconds
+sets: 1
+rest: 0
+start: 1
+intro: 1
+focus: lower back
+figure: FX_CATCOW
+muscles: lower_back abs | upper_back
+cue: On hands and knees, hands under shoulders, knees under hips.
+cue: Cat: breathe out, round your back up and tuck your tailbone and chin. Cow: breathe in, let your belly sink, tilt your pelvis forward and look up.
+cue: Move slowly from your pelvis, one vertebra at a time. No pain in the lower back.
+variation: Cat-cow | 30-60 | Flow between cat and cow, about 4 seconds each way.
+figure: FX_CATCOW
+variation: Slow cat-cow | 40-90 | About 5 seconds each way, with a short pause at the rounded and the arched end.
+figure: FX_CATCOW_SLOW
+
+@exercise FORWARD_FOLD
+title: Forward fold
+group: flexibility
+measure: seconds
+sets: 1
+rest: 0
+start: 1
+intro: 1
+figure: FX_FOLD
+muscles: hamstrings | lower_back calves
+cue: Fold from the hips, not by rounding the back first. Let the head hang.
+cue: Breathe out and sink a little more with each breath. A stretch, never a sharp pull behind the knee.
+variation: Standing forward fold | 30-60 | Feet hip-width, knees soft. Hinge forward and let your hands hang toward the floor.
+figure: FX_FOLD
+variation: Seated forward fold | 30-60 | Sit with your legs straight out. Reach for your shins or toes, chest toward your thighs.
+figure: FX_FOLD_SEATED
+
+@exercise HIP_FLEXOR
+title: Hip flexor stretch
+group: flexibility
+measure: seconds
+sets: 1
+rest: 0
+start: 1
+intro: 1
+sides: each
+focus: lower back
+figure: FX_HIPFLEX
+muscles: quads glutes | lower_back abs
+cue: Kneel on one knee (on a towel), the other foot flat in front, both knees bent about 90°.
+cue: Tuck your tailbone under and squeeze the glute of the back leg, then shift your hips forward a little. Feel it at the front of the back hip.
+cue: Keep the lower back from arching: ribs down.
+variation: Half-kneeling hip flexor stretch | 30-60 | Hands on your hips or the front knee.
+figure: FX_HIPFLEX
+variation: Hip flexor stretch with a reach | 30-60 | Raise the arm on the kneeling side overhead and lean a little away from it.
+figure: FX_HIPFLEX_REACH
+
+@exercise CHEST_OPENER
+title: Chest opener
+group: flexibility
+measure: seconds
+sets: 1
+rest: 0
+start: 1
+intro: 1
+figure: FX_CHEST
+muscles: chest shoulders | biceps lats
+cue: Shoulders back and down, away from your ears.
+cue: Breathe into your chest. Ease off if anything tingles down the arms.
+variation: Hands clasped behind the back | 30-60 | Stand tall, clasp your hands behind you and lift them gently away from your back.
+figure: FX_CHEST
+variation: Puppy pose | 30-60 | On hands and knees, walk your hands forward and let your chest sink toward the floor, hips above the knees.
+figure: FX_PUPPY
+
+@exercise HIP_OPENER
+title: Hip opener
+group: flexibility
+measure: seconds
+sets: 1
+rest: 0
+start: 1
+intro: 1
+sides: each
+focus: lower back
+figure: FX_FIGURE4
+muscles: glutes lower_back | hamstrings
+cue: Keep the knee comfortable: the stretch is deep in the hip and buttock, not in the knee.
+cue: Keep your back long and breathe slowly.
+variation: Lying figure-4 | 30-60 | On your back, cross one ankle over the other knee and pull that thigh toward you.
+figure: FX_FIGURE4
+variation: Pigeon | 30-60 | Front shin across in front of you, back leg straight behind. Hands on the floor, then lower your chest when you can.
+figure: FX_PIGEON
+
+@exercise SIDE_BEND
+title: Side bend
+group: flexibility
+measure: seconds
+sets: 1
+rest: 0
+start: 1
+intro: 1
+sides: each
+figure: FX_SIDEBEND
+muscles: obliques lats | shoulders
+cue: Feet a little apart. Lean straight to the side, not forward or back.
+cue: Reach long through the fingers and breathe into the stretched side.
+variation: Standing side bend, one arm | 30-60 | One arm overhead, lean away from it.
+figure: FX_SIDEBEND
+variation: Standing side bend, both arms | 30-60 | Both arms overhead, hold one wrist with the other hand and lean toward that side.
+figure: FX_SIDEBEND_BOTH
+
+@exercise KNEES_TO_CHEST
+title: Knees to chest
+group: flexibility
+measure: seconds
+sets: 1
+rest: 0
+start: 1
+intro: 1
+focus: lower back
+figure: FX_KNEES_CHEST
+muscles: lower_back glutes | hamstrings
+cue: Let the lower back relax into the floor (or the hips toward the heels) with each breath out.
+cue: Gentle: this is a release for the lower back, not a strain.
+variation: Knees to chest | 30-60 | On your back, hug both knees in toward your chest. Rock a little side to side if it feels good.
+figure: FX_KNEES_CHEST
+variation: Child's pose | 30-60 | Kneel, sit your hips back toward your heels and lay your arms long in front, forehead down.
+figure: FX_CHILD
+
+@exercise THREAD_NEEDLE
+title: Thread the needle
+group: flexibility
+measure: seconds
+sets: 1
+rest: 0
+start: 1
+intro: 1
+sides: each
+figure: FX_THREAD_OPEN
+muscles: upper_back shoulders | obliques
+cue: On hands and knees, hips stay over the knees: the turn comes from the upper back.
+cue: Follow your hand with your eyes and breathe out as you turn.
+variation: Open book | 30-60 | Reach one arm up to the ceiling, turning your chest open, and hold.
+figure: FX_THREAD_OPEN
+variation: Thread the needle | 30-60 | Slide one arm under the other along the floor and rest that shoulder and ear down.
+figure: FX_THREAD
+
+@exercise LYING_TWIST
+title: Lying twist
+group: flexibility
+measure: seconds
+sets: 1
+rest: 0
+start: 1
+intro: 1
+sides: each
+focus: lower back
+figure: FX_TWIST_KNEES
+muscles: lower_back obliques | glutes chest
+cue: Arms out on the floor, shoulders stay down. Turn your head away from your knees.
+cue: Only go as far as your shoulders stay flat. Breathe into the twist.
+variation: Knee drop | 30-60 | On your back, knees bent and feet on the floor. Lower both knees to one side.
+figure: FX_TWIST_KNEES
+variation: Cross-over twist | 30-60 | One leg long, pull the other knee across your body with the opposite hand.
+figure: FX_TWIST
+
+@exercise CALF_STRETCH
+title: Calf stretch
+group: flexibility
+measure: seconds
+sets: 1
+rest: 0
+start: 1
+intro: 1
+sides: each
+figure: FX_CALF
+muscles: calves feet | hamstrings
+cue: Hands on a wall, one foot back, its heel pressed into the floor and toes pointing forward.
+cue: Lean in slowly until you feel the calf, not the Achilles tendon.
+variation: Straight-knee calf stretch | 30-60 | Back knee straight.
+figure: FX_CALF
+variation: Bent-knee calf stretch | 30-60 | Bend the back knee a little, heel still down. You'll feel it lower, near the ankle.
+figure: FX_CALF_BENT
+
+@exercise DEEP_SQUAT
+title: Deep squat hold
+group: flexibility
+measure: seconds
+sets: 1
+rest: 0
+start: 1
+intro: 1
+focus: lower back
+figure: FX_DEEP_SQUAT
+muscles: glutes feet | lower_back calves quads
+cue: Feet a little wider than hips, toes turned out. Heels down if you can (a folded towel under them is fine).
+cue: Chest up and relax down into the bottom. Breathe, and let your hips and lower back open.
+variation: Deep squat hold | 30-60 | Hands together at your chest, elbows gently pushing your knees out.
+figure: FX_DEEP_SQUAT
+variation: Deep squat, arms overhead | 30-60 | Same, with both arms reaching up.
+figure: FX_DEEP_SQUAT_ARMS
+
 // ───────────────────────────── WARM-UP ─────────────────────────────
 
 @warmup

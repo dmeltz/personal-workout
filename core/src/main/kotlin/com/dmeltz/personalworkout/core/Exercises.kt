@@ -7,6 +7,12 @@ enum class Group(val label: String, val short: String) {
     LEGS("Legs and glutes", "Legs"),
     CORE("Core", "Core"),
     CONDITIONING("Conditioning", "Conditioning"),
+    /** Cooldown stretches. They have their own level, but don't count as muscle work or in the overall level. */
+    FLEXIBILITY("Flexibility: cooldown stretches", "Flex"),
+    ;
+
+    /** Strength groups count toward the muscles' work and level, and the overall level. */
+    val strength: Boolean get() = this != FLEXIBILITY
 }
 
 enum class Measure { REPS, SECONDS }
@@ -80,6 +86,8 @@ data class Exercise(
     val primary: List<Muscle> = emptyList(),
     /** Muscles that help or stabilize. */
     val secondary: List<Muscle> = emptyList(),
+    /** A stretch for the lower back and pelvis: every cooldown has one (Daniel asked for the emphasis). */
+    val lowerBack: Boolean = false,
 ) {
     fun variation(index: Int): Variation = variations[index.coerceIn(0, variations.lastIndex)]
     val unit: String get() = if (measure == Measure.REPS) "reps" else "s"
@@ -196,7 +204,8 @@ class Figure(
  * line: Stop if something hurts.
  * ```
  *
- * Optional lines: "sides: each" or "sides: alternate" (the target is then per side), "equipment: pull-up bar".
+ * Optional lines: "sides: each" or "sides: alternate" (the target is then per side), "equipment: pull-up bar",
+ * "focus: lower back" (a stretch for the lower back and pelvis; see [Exercise.lowerBack]).
  * A variation can end with "| each", "| alternate" or "| none" when it differs from its exercise, and
  * a "figure:" line after a variation gives that variation its own stick figure. Lines starting with "//" and blank lines are ignored.
  */
@@ -259,6 +268,11 @@ object LibraryParser {
                 variations = variations.toList(),
                 primary = muscles(exId, need("muscles").substringBefore("|")),
                 secondary = muscles(exId, need("muscles").substringAfter("|", "")),
+                lowerBack = when (fields["focus"]) {
+                    null -> false
+                    "lower back" -> true
+                    else -> error("Exercise $exId: focus must be 'lower back'")
+                },
             )
             require(ex.variations.isNotEmpty()) { "Exercise $exId has no variations" }
             require(ex.start in ex.variations.indices) { "Exercise $exId: start is past the last variation" }
@@ -295,7 +309,7 @@ object LibraryParser {
                 line.startsWith("cue:") -> (if (inVariation) varCues else cues) += line.substringAfter(":").trim()
                 line.contains(":") -> {
                     val key = line.substringBefore(":").trim()
-                    if (key !in setOf("title", "group", "measure", "sides", "sets", "rest", "start", "intro", "equipment", "figure", "muscles")) {
+                    if (key !in setOf("title", "group", "measure", "sides", "sets", "rest", "start", "intro", "equipment", "figure", "muscles", "focus")) {
                         fail("unknown field")
                     }
                     fields[key] = line.substringAfter(":").trim()

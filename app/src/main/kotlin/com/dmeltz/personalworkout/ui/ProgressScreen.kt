@@ -69,6 +69,7 @@ val groupColors = mapOf(
     Group.LEGS to Color(0xFFFFB066),
     Group.CORE to Color(0xFFD9A6FF),
     Group.CONDITIONING to Color(0xFFFF7A7A),
+    Group.FLEXIBILITY to Color(0xFF6FD6D0),
 )
 
 @Composable
@@ -327,7 +328,7 @@ private fun MuscleDayGrid(
     // For each muscle and day, the planned exercises that mainly work it.
     val cells: Map<Muscle, List<List<Pair<Exercise, Planner.Item>>>> = remember(plan) {
         Muscle.entries.associateWith { m ->
-            plan.map { d -> d.items.mapNotNull { item -> library.exercise(item.exerciseId)?.takeIf { ex -> m in ex.primary }?.let { ex -> ex to item } } }
+            plan.map { d -> d.items.mapNotNull { item -> library.exercise(item.exerciseId)?.takeIf { ex -> ex.group.strength && m in ex.primary }?.let { ex -> ex to item } } }
         }
     }
     val missed = Muscle.entries.filter { m -> cells.getValue(m).all { it.isEmpty() } }

@@ -37,11 +37,14 @@ object SessionBuilder {
      */
     const val MUSCLE_EVERY = 3
 
-    /** The groups a day allows: a capoeira day has no legs or conditioning. */
+    /** The strength groups a day allows: a capoeira day has no legs or conditioning. Stretches are the cooldown. */
     fun allowedGroups(kind: DayKind): Set<Group> = when (kind) {
         DayKind.CAPOEIRA -> setOf(Group.PUSH, Group.PULL, Group.CORE)
-        else -> Group.entries.toSet()
+        else -> Group.entries.filter { it.strength }.toSet()
     }
+
+    /** Stretches at the end of every session. */
+    const val COOLDOWN_STRETCHES = 2
 
     fun dayKind(state: AppState, today: Day): DayKind = when {
         state.isCapoeira(today) -> DayKind.CAPOEIRA
@@ -60,12 +63,14 @@ object SessionBuilder {
      * in it. After that, a muscle that no started exercise mainly works gets one right away, one a
      * day; the rest join one at a time, a few days apart.
      */
-    fun newExercises(library: Library, state: AppState, today: Day, allowed: Set<Group> = Group.entries.toSet()): List<Exercise> {
-        if (state.exercises.isEmpty()) return library.exercises.filter { it.intro == 1 }
-        val lastIntroduced = state.exercises.values.maxOf { it.introducedOn }
+    fun newExercises(library: Library, state: AppState, today: Day, allowed: Set<Group> = allowedGroups(DayKind.NORMAL)): List<Exercise> {
+        val strength = library.exercises.filter { it.group.strength }
+        val started = strength.filter { state.exerciseState(it.id) != null }
+        if (started.isEmpty()) return strength.filter { it.intro == 1 }
+        val lastIntroduced = started.maxOf { state.exerciseState(it.id)!!.introducedOn }
         if (today <= lastIntroduced) return emptyList()
-        val covered = library.exercises.filter { state.exerciseState(it.id) != null }.flatMap { it.primary }.toSet()
-        val unstarted = library.exercises.withIndex().filter { state.exerciseState(it.value.id) == null }
+        val covered = started.flatMap { it.primary }.toSet()
+        val unstarted = strength.withIndex().filter { state.exerciseState(it.value.id) == null }
         unstarted.filter { (it.value.primary - covered).isNotEmpty() && it.value.group in allowed }
             .minWithOrNull(compareBy({ it.value.intro }, { it.index }))?.let { return listOf(it.value) }
         val struggling = state.exercises.values.any { it.struggles >= STRUGGLING }
@@ -77,7 +82,7 @@ object SessionBuilder {
 
     /** The last day an exercise that mainly works [m] was done, or never. */
     private fun lastWorked(library: Library, state: AppState, m: Muscle): Day =
-        library.exercises.filter { m in it.primary }
+        library.exercises.filter { it.group.strength && m in it.primary }
             .mapNotNull { state.exerciseState(it.id)?.lastDone?.takeIf { d -> d >= 0 } }
             .maxOrNull() ?: Long.MIN_VALUE
 
@@ -90,8 +95,8 @@ object SessionBuilder {
         val light = kind == DayKind.CAPOEIRA
         val allowed = allowedGroups(kind) - (if (light) setOf(Group.CONDITIONING) else emptySet())
         fun lastTrained(g: Group) = state.groupLastTrained[g.name] ?: Long.MIN_VALUE
-        val first = state.exercises.isEmpty()
-        val starting = newExercises(library, state, today, allowed)
+        val first = state.exercises.keys.none { library.exercise(it)?.group?.strength == true }
+        val starting = newExercises(library, state, today, allowed).toMutableList()
         val todaysNew = if (first) emptyList() else starting
         fun isStarted(ex: Exercise) = state.exerciseState(ex.id) != null || ex in starting
         fun stateOf(ex: Exercise) = state.exerciseState(ex.id) ?: state.initialState(ex, today)
@@ -167,6 +172,13 @@ object SessionBuilder {
         val ordered = mutableListOf<Exercise>()
         while (queues.any { it.isNotEmpty() }) for (q in queues) if (q.isNotEmpty()) ordered += q.removeAt(0)
         ordered += chosen.filter { it.group == Group.CONDITIONING }
+        // Cooldown: one lower back and pelvis stretch and one other, each the one done longest ago.
+        val stretches = library.exercises.filter { it.group == Group.FLEXIBILITY }
+        fun stretch(lowerBack: Boolean) = stretches.filter { it.lowerBack == lowerBack }
+            .minWithOrNull(compareBy(::lastDone, { stretches.indexOf(it) }))
+        val cooldown = listOfNotNull(stretch(true), stretch(false)).take(COOLDOWN_STRETCHES)
+        starting += cooldown.filter { state.exerciseState(it.id) == null && it !in starting }
+        ordered += cooldown
         total = ordered.sumOf { seconds(it, stateOf(it)) }
         return SessionPlan(kind, ordered.map { it.id }, starting.map { it.id }, (total + 119) / 60 + 2)
     }
