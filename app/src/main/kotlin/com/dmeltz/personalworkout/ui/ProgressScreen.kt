@@ -310,6 +310,7 @@ private val HeaderHeight = 40.dp
 private val NotStarted = Color(0xFF55617A)
 private val Missed = Color(0xFFFF8A65)
 private val StretchColor = Color(0xFF6FD6D0)
+private val StrengthColor = Color.White
 
 /**
  * The muscle table: one row per muscle and one column per day for the next 10 days. A cell shows
@@ -347,7 +348,10 @@ private fun MuscleDayGrid(
     )
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)).background(groupColors.getValue(Group.PUSH).copy(alpha = 0.16f)))
+            Box(
+                Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)).background(groupColors.getValue(Group.PUSH).copy(alpha = 0.16f))
+                    .border(2.dp, StrengthColor, RoundedCornerShape(4.dp)),
+            )
             Text(" Strengthening", style = MaterialTheme.typography.labelSmall)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -449,9 +453,10 @@ private fun MuscleDayGrid(
                             val each = if (here.size <= 1) 46.dp else (DayWidth - 4.dp) / here.size.coerceAtMost(3)
                             for ((ex, item) in here.take(3)) {
                                 Figures.views(ex.figureAt(item.variation)).firstOrNull()?.let { f ->
-                                    // Strengthening: a tinted tile. Stretch: no fill, a teal outline.
+                                    // Strengthening: a tinted tile with a white outline. Stretch: no fill, a teal outline.
                                     val tile = if (ex.group.strength) {
                                         Modifier.background(groupColors.getValue(ex.group).copy(alpha = 0.16f))
+                                            .border(2.dp, StrengthColor, RoundedCornerShape(6.dp))
                                     } else {
                                         Modifier.border(2.dp, StretchColor, RoundedCornerShape(6.dp))
                                     }
