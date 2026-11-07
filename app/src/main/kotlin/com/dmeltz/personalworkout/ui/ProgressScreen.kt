@@ -332,9 +332,20 @@ private fun MuscleDayGrid(
         }
     }
     val missed = Muscle.entries.filter { m -> cells.getValue(m).all { it.isEmpty() } }
+    // The cooldown stretches, in two rows: the lower back and pelvis one, and the other one.
+    val stretchRows: List<Pair<String, List<List<Pair<Exercise, Planner.Item>>>>> = remember(plan) {
+        listOf(true to "Stretch: lower back, pelvis", false to "Stretch: other").map { (lowerBack, label) ->
+            label to plan.map { d ->
+                d.items.mapNotNull { item ->
+                    library.exercise(item.exerciseId)?.takeIf { it.group == Group.FLEXIBILITY && it.lowerBack == lowerBack }?.let { it to item }
+                }
+            }
+        }
+    }
     Text(
-        "Next 10 days: tap an exercise to open it. Swipe sideways for more days. A forecast that " +
-            "assumes each planned exercise is done in full and rated OK.",
+        "Next 10 days: tap an exercise to open it. Swipe sideways for more days. The cooldown " +
+            "stretches are in the last two rows. A forecast that assumes each planned exercise is done " +
+            "in full and rated OK.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.outline,
     )
@@ -386,6 +397,19 @@ private fun MuscleDayGrid(
                     }
                 }
             }
+            for ((label, _) in stretchRows) {
+                Row(Modifier.height(RowHeight).fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).background(groupColors.getValue(Group.FLEXIBILITY), CircleShape))
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = groupColors.getValue(Group.FLEXIBILITY),
+                        maxLines = 2,
+                        lineHeight = MaterialTheme.typography.bodySmall.fontSize,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+            }
         }
         Column(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
             Row(Modifier.height(HeaderHeight)) {
@@ -414,14 +438,14 @@ private fun MuscleDayGrid(
                     }
                 }
             }
-            for (m in Muscle.entries) {
-                val isSelected = m in lit
+            @Composable
+            fun DayCells(days: List<List<Pair<Exercise, Planner.Item>>>, isSelected: Boolean) {
                 Row(
                     Modifier.height(RowHeight)
                         .background(if (isSelected) selectedBg else Color.Transparent)
                         .drawBehind { drawLine(line, Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1f) },
                 ) {
-                    cells.getValue(m).forEachIndexed { i, here ->
+                    days.forEachIndexed { i, here ->
                         Row(
                             Modifier.width(DayWidth).fillMaxHeight()
                                 .background(if (plan[i].kind == DayKind.REST && !isSelected) restBg else Color.Transparent),
@@ -446,6 +470,8 @@ private fun MuscleDayGrid(
                     }
                 }
             }
+            for (m in Muscle.entries) DayCells(cells.getValue(m), m in lit)
+            for ((_, days) in stretchRows) DayCells(days, false)
         }
     }
 }
