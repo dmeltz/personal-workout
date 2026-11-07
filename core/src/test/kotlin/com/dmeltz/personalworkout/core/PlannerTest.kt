@@ -72,4 +72,11 @@ class PlannerTest {
         assertEquals(null, Progression.muscleLastWorked(library, state, Muscle.HAMSTRINGS))
         assertTrue(Progression.groupLevel(library, state, Group.FLEXIBILITY) != null)
     }
+
+    @Test fun removedExercisesLeaveTodaysSession() {
+        assertEquals(null, library.exercise("BAG"), "bag rounds were removed")
+        val session = ActiveSession(monday, 1, DayKind.NORMAL, listOf("PUSHUP", "BAG", "SQUAT"), position = 1)
+        val s = Migrations.run(library, AppState(activeSession = session))
+        assertEquals(listOf("PUSHUP", "SQUAT"), s.activeSession!!.exerciseIds)
+    }
 }

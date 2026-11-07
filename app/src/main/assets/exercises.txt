@@ -418,27 +418,6 @@ figure: LEG_RAISE
 
 // ───────────────────────────── CONDITIONING ─────────────────────────────
 
-@exercise BAG
-title: Bag rounds
-group: conditioning
-measure: seconds
-sets: 2
-rest: 45
-start: 1
-intro: 2
-equipment: boxing bag
-figure: BAG
-muscles: shoulders | obliques chest triceps wrists
-cue: Stand side-on, hands up guarding your chin, knees soft. Keep moving your feet.
-cue: Punch with your whole body: turn your hip and shoulder into it, and bring the hand straight back to your face.
-cue: Breathe out on every punch. Wrap or glove your hands so your wrists stay straight.
-variation: Steady round | 30-60 | Jab and cross at a steady pace.
-figure: BAG
-variation: Moving round | 30-75 | Jab, cross and hooks, moving around the bag.
-figure: BAG_HOOKS
-variation: Power round | 30-60 | Hard combinations of 3-4 punches, short rest inside the round.
-figure: BAG_HOOKS
-
 @exercise BEAR_CRAWL
 title: Bear crawl
 group: conditioning
@@ -446,7 +425,7 @@ measure: seconds
 sets: 2
 rest: 45
 start: 1
-intro: 4
+intro: 2
 figure: BEAR
 muscles: shoulders abs | quads wrists
 cue: On hands and feet, knees bent and hovering a few centimeters above the ground.
