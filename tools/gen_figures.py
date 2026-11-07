@@ -460,6 +460,7 @@ figure("BIRDDOG", [quad(), quad("armL", "legR"), quad(), quad("armR", "legL")],
        ["side", "high"], props=[mat()], loop=True, ms=4000)
 
 # ── Conditioning ──
+# Boxing poses (the bag rounds were removed on 2026-11-07; kept for a possible return).
 BAG_Z = 30
 def boxing(jab=False, cross=False):
     s = dict(hip=(0, 38, 0), yaw=-18, head=8, feetL="flat", feetR=30,
@@ -470,8 +471,6 @@ def boxing(jab=False, cross=False):
     if cross:
         s["yaw"] = 12; s["hip"] = (0, 38, 1.5)
     return s
-figure("BAG", [boxing(), boxing(jab=True), boxing(), boxing(cross=True)],
-       ["side", "back3q"], props=[bag(0, BAG_Z, 9, 32, 92)], loop=True, ms=1800)
 
 def bear(step=0):
     """Hands under shoulders, knees under hips and off the floor. step ±1 moves one hand and the
@@ -749,8 +748,6 @@ def hook(side):
     else:
         s["armR"] = ik((2, 67, BAG_Z - 10), (-1, 0.1, 0), planted=False); s["yaw"] = 20; s["feetR"] = 10
     return s
-figure("BAG_HOOKS", [boxing(), boxing(jab=True), boxing(), boxing(cross=True), boxing(), hook("L"), boxing(), hook("R")],
-       ["side", "back3q"], props=[bag(0, BAG_Z, 9, 32, 92)], loop=True, ms=3200)
 
 # ── Bear ──
 figure("BEAR_HOLD", [bear(0)], ["side", "high"], props=[mat()])
