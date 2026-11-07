@@ -2,6 +2,7 @@ package com.dmeltz.personalworkout.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -308,6 +309,7 @@ private val DayWidth = 56.dp
 private val HeaderHeight = 40.dp
 private val NotStarted = Color(0xFF55617A)
 private val Missed = Color(0xFFFF8A65)
+private val StretchColor = Color(0xFF6FD6D0)
 
 /**
  * The muscle table: one row per muscle and one column per day for the next 10 days. A cell shows
@@ -325,30 +327,34 @@ private fun MuscleDayGrid(
     onExercise: (String) -> Unit,
 ) {
     val plan = remember(state) { Planner.nextDays(library, state, today(), 10) }
-    // For each muscle and day, the planned exercises that mainly work it.
+    // For each muscle and day, the planned exercises that mainly work it: strength exercises first,
+    // then the cooldown stretches that mainly stretch it.
     val cells: Map<Muscle, List<List<Pair<Exercise, Planner.Item>>>> = remember(plan) {
         Muscle.entries.associateWith { m ->
-            plan.map { d -> d.items.mapNotNull { item -> library.exercise(item.exerciseId)?.takeIf { ex -> ex.group.strength && m in ex.primary }?.let { ex -> ex to item } } }
-        }
-    }
-    val missed = Muscle.entries.filter { m -> cells.getValue(m).all { it.isEmpty() } }
-    // The cooldown stretches, in two rows: the lower back and pelvis one, and the other one.
-    val stretchRows: List<Pair<String, List<List<Pair<Exercise, Planner.Item>>>>> = remember(plan) {
-        listOf(true to "Stretch: lower back, pelvis", false to "Stretch: other").map { (lowerBack, label) ->
-            label to plan.map { d ->
-                d.items.mapNotNull { item ->
-                    library.exercise(item.exerciseId)?.takeIf { it.group == Group.FLEXIBILITY && it.lowerBack == lowerBack }?.let { it to item }
-                }
+            plan.map { d ->
+                d.items.mapNotNull { item -> library.exercise(item.exerciseId)?.takeIf { ex -> m in ex.primary }?.let { ex -> ex to item } }
+                    .sortedBy { !it.first.group.strength }
             }
         }
     }
+    // Only strength work counts as working a muscle; stretches don't.
+    val missed = Muscle.entries.filter { m -> cells.getValue(m).all { day -> day.none { it.first.group.strength } } }
     Text(
-        "Next 10 days: tap an exercise to open it. Swipe sideways for more days. The cooldown " +
-            "stretches are in the last two rows. A forecast that assumes each planned exercise is done " +
-            "in full and rated OK.",
+        "Next 10 days: tap an exercise to open it. Swipe sideways for more days. A forecast that " +
+            "assumes each planned exercise is done in full and rated OK.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.outline,
     )
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)).background(groupColors.getValue(Group.PUSH).copy(alpha = 0.16f)))
+            Text(" Strengthening", style = MaterialTheme.typography.labelSmall)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(16.dp).border(2.dp, StretchColor, RoundedCornerShape(4.dp)))
+            Text(" Stretch (cooldown)", style = MaterialTheme.typography.labelSmall, color = StretchColor)
+        }
+    }
     Text(
         if (missed.isEmpty()) "✓ Every muscle is worked in the next 10 days."
         else "Not worked in the next 10 days: ${missed.joinToString { it.label.lowercase() }}.",
@@ -397,19 +403,6 @@ private fun MuscleDayGrid(
                     }
                 }
             }
-            for ((label, _) in stretchRows) {
-                Row(Modifier.height(RowHeight).fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(10.dp).background(groupColors.getValue(Group.FLEXIBILITY), CircleShape))
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = groupColors.getValue(Group.FLEXIBILITY),
-                        maxLines = 2,
-                        lineHeight = MaterialTheme.typography.bodySmall.fontSize,
-                        modifier = Modifier.padding(start = 6.dp),
-                    )
-                }
-            }
         }
         Column(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
             Row(Modifier.height(HeaderHeight)) {
@@ -456,10 +449,16 @@ private fun MuscleDayGrid(
                             val each = if (here.size <= 1) 46.dp else (DayWidth - 4.dp) / here.size.coerceAtMost(3)
                             for ((ex, item) in here.take(3)) {
                                 Figures.views(ex.figureAt(item.variation)).firstOrNull()?.let { f ->
+                                    // Strengthening: a tinted tile. Stretch: no fill, a teal outline.
+                                    val tile = if (ex.group.strength) {
+                                        Modifier.background(groupColors.getValue(ex.group).copy(alpha = 0.16f))
+                                    } else {
+                                        Modifier.border(2.dp, StretchColor, RoundedCornerShape(6.dp))
+                                    }
                                     Box(
                                         Modifier.size(each)
                                             .clip(RoundedCornerShape(6.dp))
-                                            .background(groupColors.getValue(ex.group).copy(alpha = 0.16f))
+                                            .then(tile)
                                             .clickable { onExercise(ex.id) },
                                     ) {
                                         StickFigure(f, Modifier.fillMaxSize(), still = true)
@@ -471,7 +470,6 @@ private fun MuscleDayGrid(
                 }
             }
             for (m in Muscle.entries) DayCells(cells.getValue(m), m in lit)
-            for ((_, days) in stretchRows) DayCells(days, false)
         }
     }
 }
