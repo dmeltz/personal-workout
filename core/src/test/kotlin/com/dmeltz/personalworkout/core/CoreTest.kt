@@ -189,6 +189,20 @@ class CoreTest {
         assertEquals(1, state.streak(monday))
     }
 
+    @Test fun nextMovesTheExerciseToTheEnd() {
+        val plan = SessionBuilder.build(library, AppState(), monday)
+        var state = Sessions.start(library, AppState(), plan, monday)
+        val ids = plan.exerciseIds
+        state = Sessions.postpone(state)
+        assertEquals(ids.drop(1) + ids.first(), state.activeSession!!.exerciseIds)
+        assertEquals(0, state.activeSession!!.position)
+        // The last one left stays put.
+        for (id in ids.drop(1)) state = Sessions.log(state, ex(id), listOf(5, 5), Effort.OK, monday)
+        val last = state.activeSession!!
+        assertEquals(ids.first(), last.next())
+        assertEquals(last, Sessions.postpone(state).activeSession)
+    }
+
     @Test fun loggedExerciseCanBeCorrected() {
         val plan = SessionBuilder.build(library, AppState(), monday)
         var state = Sessions.start(library, AppState(), plan, monday, now = 1234L)

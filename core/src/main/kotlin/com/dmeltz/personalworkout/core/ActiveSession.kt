@@ -52,6 +52,18 @@ object Sessions {
     fun warmupDone(state: AppState): AppState =
         state.copy(activeSession = state.activeSession?.copy(warmupDone = true))
 
+    /**
+     * "Next" without logging: the current exercise moves to the end of the session, so it can still
+     * be done later. Nothing changes when it is already the last one left.
+     */
+    fun postpone(state: AppState): AppState {
+        val session = state.activeSession ?: return state
+        val ids = session.exerciseIds
+        val p = session.position
+        if (p >= ids.size - 1) return state
+        return state.copy(activeSession = session.copy(exerciseIds = ids.take(p) + ids.drop(p + 1) + ids[p]))
+    }
+
     /** Logs the next exercise: progression, muscle group recovery, and the session position. */
     fun log(state: AppState, ex: Exercise, done: List<Int>, effort: Effort, today: Day): AppState {
         val session = state.activeSession ?: return state

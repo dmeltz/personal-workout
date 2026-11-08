@@ -3,6 +3,7 @@ package com.dmeltz.personalworkout.ui
 import android.media.AudioManager
 import android.media.ToneGenerator
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -112,6 +113,11 @@ fun SessionScreen(
     val logged = remember { mutableStateListOf<Logged>() }
     val speaker = rememberSpeaker()
     val paused = remember { mutableStateOf(false) }
+    // "Start over" runs the current exercise again from its first set.
+    var restarts by remember { mutableIntStateOf(0) }
+    // "Back": an exercise logged on this screen being done again (an index into [logged]). Its new
+    // result replaces the earlier log, and then the workout carries on where it was.
+    var redo by remember { mutableStateOf<Int?>(null) }
 
     // The overall clock: from the session's start (or this screen's, for a session saved before
     // start times were kept) until it is finished.
@@ -233,11 +239,54 @@ fun SessionScreen(
             }) { Text(if (state.readAloud) "🔊" else "🔇", fontSize = 18.sp) }
         }
         if (paused.value && !done) {
-            Button(
-                onClick = { paused.value = false },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Good, contentColor = Color(0xFF0B1B3A)),
-            ) { Text("Paused. Tap to continue", fontWeight = FontWeight.Bold) }
+            // Paused: continue, or move around the workout.
+            val inWorkout = session?.warmupDone == true
+            val canBack = (redo ?: logged.size) > 0
+            val canNext = redo != null || position < planned - 1
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { paused.value = false },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Good, contentColor = Color(0xFF0B1B3A)),
+                ) { Text("▶  Continue", fontWeight = FontWeight.Bold) }
+                if (inWorkout) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                redo = (redo ?: logged.size) - 1
+                                lastMessage = null
+                                paused.value = false
+                            },
+                            enabled = canBack,
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                        ) { Text("⏮ Back", maxLines = 1) }
+                        OutlinedButton(
+                            onClick = { restarts++; paused.value = false },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                        ) { Text("↺ Start over", maxLines = 1) }
+                        OutlinedButton(
+                            onClick = {
+                                val r = redo
+                                if (r != null) redo = (r + 1).takeIf { it < logged.size }
+                                else update(Sessions.postpone(state))
+                                lastMessage = null
+                                paused.value = false
+                            },
+                            enabled = canNext,
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                        ) { Text("Next ⏭", maxLines = 1) }
+                    }
+                    Text(
+                        "Back: do the previous exercise again; the new result replaces the old one. " +
+                            "Start over: this exercise from its first set. Next: this exercise waits until the end.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
+            }
         }
         CompositionLocalProvider(LocalPaused provides paused) { Column(
             Modifier.fillMaxSize().verticalScroll(scroll).padding(20.dp),
@@ -251,11 +300,35 @@ fun SessionScreen(
                     TodaysMuscles(todays)
                     WarmupView(library.warmup, speak = { if (state.readAloud) speaker.say(it) }) { update(Sessions.warmupDone(state)) }
                 }
+                redo != null -> {
+                    // Doing an earlier exercise again, from the state it had before its log.
+                    val r = redo!!
+                    val l = logged[r]
+                    Text(
+                        "Doing ${l.ex.title} again: this result replaces the earlier one.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                    key(l.ex.id, "redo", r, restarts) {
+                        ExerciseView(
+                            l.ex, l.before, position - (logged.size - r), planned,
+                            history.filter { it.exerciseId == l.ex.id && it.day != day },
+                            readAloud = state.readAloud,
+                            speak = speaker::say,
+                            cue = speaker::interject,
+                        ) { sets, effort ->
+                            speaker.stop()
+                            correct(r, sets, effort)
+                            lastMessage = "Updated ${l.ex.title}."
+                            redo = (r + 1).takeIf { it < logged.size }
+                        }
+                    }
+                }
                 else -> {
                     val ex = exercise!!
                     val es = state.exerciseState(ex.id) ?: state.initialState(ex, day)
                     lastMessage?.let { PipSays(Mood.HAPPY, it, size = 48.dp) }
-                    key(ex.id, position) {
+                    key(ex.id, position, restarts) {
                         ExerciseView(
                             ex, es, position, planned, history.filter { it.exerciseId == ex.id && it.day != day },
                             readAloud = state.readAloud,
@@ -316,7 +389,7 @@ private fun TodaysPlan(exercises: List<Exercise>, warmup: List<WarmupMove>, stat
                 PlanRow("${i + 1}. ${ex.variation(es.variation).name}", amount, seconds)
             }
             Text(
-                "Times include the rests between sets. Once the warm-up is done, the workout runs by itself. ⏸ at the top pauses it.",
+                "Times include the rests between sets. Once the warm-up is done, the workout runs by itself. ⏸ at the top pauses it, and from there you can go back, start over or skip ahead.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
