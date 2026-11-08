@@ -189,6 +189,16 @@ class CoreTest {
         assertEquals(1, state.streak(monday))
     }
 
+    @Test fun workoutRestartsOnlyBeforeAnythingIsLogged() {
+        val plan = SessionBuilder.build(library, AppState(), monday)
+        var state = Sessions.warmupDone(Sessions.start(library, AppState(), plan, monday, now = 1L))
+        val restarted = Sessions.restart(state, now = 2L).activeSession!!
+        assertEquals(false, restarted.warmupDone)
+        assertEquals(2L, restarted.startedAt)
+        state = Sessions.log(state, ex(plan.exerciseIds.first()), listOf(5, 5), Effort.OK, monday)
+        assertEquals(state, Sessions.restart(state, now = 3L))
+    }
+
     @Test fun sessionKeepsWhatBackNeeds() {
         val plan = SessionBuilder.build(library, AppState(), monday)
         var state = Sessions.start(library, AppState(), plan, monday)

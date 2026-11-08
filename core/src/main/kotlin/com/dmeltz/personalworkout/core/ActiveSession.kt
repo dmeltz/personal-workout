@@ -58,6 +58,13 @@ object Sessions {
     fun warmupDone(state: AppState): AppState =
         state.copy(activeSession = state.activeSession?.copy(warmupDone = true))
 
+    /** Starts the workout over from the warm-up, while nothing is logged yet. */
+    fun restart(state: AppState, now: Long = System.currentTimeMillis()): AppState {
+        val session = state.activeSession ?: return state
+        if (session.position > 0) return state
+        return state.copy(activeSession = session.copy(warmupDone = false, startedAt = now))
+    }
+
     /** Logs the next exercise: progression, muscle group recovery, and the session position. */
     fun log(state: AppState, ex: Exercise, done: List<Int>, effort: Effort, today: Day): AppState {
         val session = state.activeSession ?: return state

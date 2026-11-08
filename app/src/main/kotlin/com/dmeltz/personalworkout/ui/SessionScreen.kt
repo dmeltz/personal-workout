@@ -254,6 +254,8 @@ fun SessionScreen(
             // Paused: continue, or move around the workout.
             val inWorkout = session?.warmupDone == true
             val canBack = (redo ?: logged.size) > 0
+            // On the first exercise, with nothing logged yet, Back starts the whole workout over.
+            val canRestart = redo == null && position == 0
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = { paused.value = false },
@@ -264,14 +266,15 @@ fun SessionScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = {
-                                redo = (redo ?: logged.size) - 1
+                                if (canRestart) update(Sessions.restart(state))
+                                else redo = (redo ?: logged.size) - 1
                                 lastMessage = null
                                 paused.value = false
                             },
-                            enabled = canBack,
+                            enabled = canBack || canRestart,
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp),
-                        ) { Text("⏮ Back", maxLines = 1) }
+                        ) { Text(if (canRestart) "⏮ Restart" else "⏮ Back", maxLines = 1) }
                         OutlinedButton(
                             onClick = { restarts++; paused.value = false },
                             modifier = Modifier.weight(1f),
@@ -296,7 +299,8 @@ fun SessionScreen(
                         ) { Text("Next ⏭", maxLines = 1) }
                     }
                     Text(
-                        "Back: do the previous exercise again; the new result replaces the old one. " +
+                        (if (canRestart) "Restart: the whole workout again, from the warm-up. "
+                        else "Back: do the previous exercise again; the new result replaces the old one. ") +
                             "Start over: this exercise from its first set. Next: the same as Skip / couldn't do it.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
