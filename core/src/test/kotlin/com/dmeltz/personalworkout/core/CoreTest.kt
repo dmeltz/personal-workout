@@ -189,6 +189,16 @@ class CoreTest {
         assertEquals(1, state.streak(monday))
     }
 
+    @Test fun sessionKeepsWhatBackNeeds() {
+        val plan = SessionBuilder.build(library, AppState(), monday)
+        var state = Sessions.start(library, AppState(), plan, monday)
+        val first = ex(plan.exerciseIds.first())
+        val before = state.exerciseState(first.id)!!
+        val groupBefore = state.groupLastTrained[first.group.name]
+        state = Sessions.log(state, first, listOf(5, 5), Effort.OK, monday)
+        assertEquals(listOf(Undo(first.id, before, groupBefore)), state.activeSession!!.undo)
+    }
+
     @Test fun loggedExerciseCanBeCorrected() {
         val plan = SessionBuilder.build(library, AppState(), monday)
         var state = Sessions.start(library, AppState(), plan, monday, now = 1234L)

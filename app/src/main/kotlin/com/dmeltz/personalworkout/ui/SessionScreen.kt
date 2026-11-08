@@ -110,7 +110,19 @@ fun SessionScreen(
     var finished by remember { mutableStateOf<ActiveSession?>(null) }
     var lastMessage by remember { mutableStateOf<String?>(null) }
     // Everything logged on this screen, with what is needed to correct it on the summary.
-    val logged = remember { mutableStateListOf<Logged>() }
+    // It starts with what was already logged in this session, so Back works after reopening it.
+    val logged = remember {
+        mutableStateListOf<Logged>().apply {
+            val s = initialState.activeSession ?: return@apply
+            val todays = history.filter { it.day == s.day && it.session == s.number }.toMutableList()
+            for (u in s.undo) {
+                val ex = library.exercise(u.exerciseId) ?: continue
+                val r = todays.firstOrNull { it.exerciseId == u.exerciseId } ?: continue
+                todays.remove(r)
+                add(Logged(ex, u.before, u.groupDayBefore, r))
+            }
+        }
+    }
     val speaker = rememberSpeaker()
     val paused = remember { mutableStateOf(false) }
     // "Start over" runs the current exercise again from its first set.

@@ -21,12 +21,18 @@ data class ActiveSession(
     val levelledUp: List<String> = emptyList(),
     /** When the session started, in epoch milliseconds (0 for a session saved before this was kept). */
     val startedAt: Long = 0,
+    /** For each exercise logged so far, in order, what is needed to do it again after "Back". */
+    val undo: List<Undo> = emptyList(),
 ) {
     val plannedCount: Int get() = exerciseIds.size
     val doneCount: Int get() = position
     val finished: Boolean get() = position >= exerciseIds.size
     fun next(): String? = exerciseIds.getOrNull(position)
 }
+
+/** An exercise's state before it was logged, and the day its group was last trained before that. */
+@Serializable
+data class Undo(val exerciseId: String, val before: ExerciseState, val groupDayBefore: Day? = null)
 
 /** Today's unfinished session, if there is one. A session left over from an earlier day is dropped. */
 fun AppState.sessionToContinue(today: Day): ActiveSession? =
@@ -68,6 +74,7 @@ object Sessions {
                 hard = session.hard + if (effort == Effort.HARD) 1 else 0,
                 skipped = session.skipped + if (effort == Effort.SKIPPED) 1 else 0,
                 levelledUp = session.levelledUp + if (after.variation > before.variation) listOf(ex.id) else emptyList(),
+                undo = session.undo + Undo(ex.id, before, state.groupLastTrained[ex.group.name]),
             ),
         )
     }
