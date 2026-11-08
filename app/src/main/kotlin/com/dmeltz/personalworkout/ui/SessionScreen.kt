@@ -110,7 +110,19 @@ fun SessionScreen(
     var finished by remember { mutableStateOf<ActiveSession?>(null) }
     var lastMessage by remember { mutableStateOf<String?>(null) }
     // Everything logged on this screen, with what is needed to correct it on the summary.
-    val logged = remember { mutableStateListOf<Logged>() }
+    // It starts with what was already logged in this session, so Back works after reopening it.
+    val logged = remember {
+        mutableStateListOf<Logged>().apply {
+            val s = initialState.activeSession ?: return@apply
+            val todays = history.filter { it.day == s.day && it.session == s.number }.toMutableList()
+            for (u in s.undo) {
+                val ex = library.exercise(u.exerciseId) ?: continue
+                val r = todays.firstOrNull { it.exerciseId == u.exerciseId } ?: continue
+                todays.remove(r)
+                add(Logged(ex, u.before, u.groupDayBefore, r))
+            }
+        }
+    }
     val speaker = rememberSpeaker()
     val paused = remember { mutableStateOf(false) }
     // "Start over" runs the current exercise again from its first set.
@@ -205,7 +217,7 @@ fun SessionScreen(
 
     // Each new exercise starts at the top of the screen, with its instructions.
     val scroll = rememberScrollState()
-    LaunchedEffect(position, session?.warmupDone) { scroll.scrollTo(0) }
+    LaunchedEffect(position, session?.warmupDone, redo, restarts) { scroll.scrollTo(0) }
 
     Column(Modifier.fillMaxSize().padding(top = 32.dp)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -242,7 +254,8 @@ fun SessionScreen(
             // Paused: continue, or move around the workout.
             val inWorkout = session?.warmupDone == true
             val canBack = (redo ?: logged.size) > 0
-            val canNext = redo != null || position < planned - 1
+            // On the first exercise, with nothing logged yet, Back starts the whole workout over.
+            val canRestart = redo == null && position == 0
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = { paused.value = false },
@@ -253,35 +266,42 @@ fun SessionScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = {
-                                redo = (redo ?: logged.size) - 1
+                                if (canRestart) update(Sessions.restart(state))
+                                else redo = (redo ?: logged.size) - 1
                                 lastMessage = null
                                 paused.value = false
                             },
-                            enabled = canBack,
+                            enabled = canBack || canRestart,
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp),
-                        ) { Text("⏮ Back", maxLines = 1) }
+                        ) { Text(if (canRestart) "⏮ Restart" else "⏮ Back", maxLines = 1) }
                         OutlinedButton(
                             onClick = { restarts++; paused.value = false },
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp),
                         ) { Text("↺ Start over", maxLines = 1) }
                         OutlinedButton(
+                            // The same as "Skip / couldn't do it" on the exercise shown.
                             onClick = {
+                                speaker.stop()
                                 val r = redo
-                                if (r != null) redo = (r + 1).takeIf { it < logged.size }
-                                else update(Sessions.postpone(state))
-                                lastMessage = null
+                                if (r != null) {
+                                    correct(r, emptyList(), Effort.SKIPPED)
+                                    lastMessage = "Updated ${logged[r].ex.title}."
+                                    redo = (r + 1).takeIf { it < logged.size }
+                                } else exercise?.let { ex ->
+                                    log(ex, state.exerciseState(ex.id) ?: state.initialState(ex, day), emptyList(), Effort.SKIPPED)
+                                }
                                 paused.value = false
                             },
-                            enabled = canNext,
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp),
                         ) { Text("Next ⏭", maxLines = 1) }
                     }
                     Text(
-                        "Back: do the previous exercise again; the new result replaces the old one. " +
-                            "Start over: this exercise from its first set. Next: this exercise waits until the end.",
+                        (if (canRestart) "Restart: the whole workout again, from the warm-up. "
+                        else "Back: do the previous exercise again; the new result replaces the old one. ") +
+                            "Start over: this exercise from its first set. Next: the same as Skip / couldn't do it.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                     )
@@ -313,6 +333,7 @@ fun SessionScreen(
                         ExerciseView(
                             l.ex, l.before, position - (logged.size - r), planned,
                             history.filter { it.exerciseId == l.ex.id && it.day != day },
+                            again = true,
                             readAloud = state.readAloud,
                             speak = speaker::say,
                             cue = speaker::interject,
@@ -485,6 +506,8 @@ private fun ExerciseView(
     position: Int,
     planned: Int,
     previous: List<WorkoutRecord>,
+    /** Done again after Back. */
+    again: Boolean = false,
     readAloud: Boolean,
     speak: (String) -> Unit,
     /** Reads a short cue now; instructions still being read carry on after it. */
@@ -497,6 +520,7 @@ private fun ExerciseView(
     val spoken = remember(ex.id, es.variation) { instructions(ex, es, previous.none { it.variationIndex == es.variation }) }
     LaunchedEffect(ex.id, es.variation) {
         val intro = when {
+            again -> "Again. "
             ex.group == Group.FLEXIBILITY -> "Cooldown stretch. "
             position > 0 -> "Moving to the next exercise. "
             else -> ""
