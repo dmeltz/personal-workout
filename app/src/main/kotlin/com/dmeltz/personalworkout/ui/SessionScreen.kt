@@ -45,6 +45,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -109,27 +110,18 @@ fun SessionScreen(
     // Kept for the summary after the session is finished and cleared from the state.
     var finished by remember { mutableStateOf<ActiveSession?>(null) }
     var lastMessage by remember { mutableStateOf<String?>(null) }
-    // Everything logged on this screen, with what is needed to correct it on the summary.
-    // It starts with what was already logged in this session, so Back works after reopening it.
-    val logged = remember {
-        mutableStateListOf<Logged>().apply {
+    // This session's log records by exercise, including those from before the screen opened, so an
+    // exercise done again after Back replaces its record.
+    val records = remember {
+        mutableStateMapOf<String, WorkoutRecord>().apply {
             val s = initialState.activeSession ?: return@apply
-            val todays = history.filter { it.day == s.day && it.session == s.number }.toMutableList()
-            for (u in s.undo) {
-                val ex = library.exercise(u.exerciseId) ?: continue
-                val r = todays.firstOrNull { it.exerciseId == u.exerciseId } ?: continue
-                todays.remove(r)
-                add(Logged(ex, u.before, u.groupDayBefore, r))
-            }
+            for (r in history) if (r.day == s.day && r.session == s.number) put(r.exerciseId, r)
         }
     }
     val speaker = rememberSpeaker()
     val paused = remember { mutableStateOf(false) }
     // "Start over" runs the current exercise again from its first set.
     var restarts by remember { mutableIntStateOf(0) }
-    // "Back": an exercise logged on this screen being done again (an index into [logged]). Its new
-    // result replaces the earlier log, and then the workout carries on where it was.
-    var redo by remember { mutableStateOf<Int?>(null) }
 
     // The overall clock: from the session's start (or this screen's, for a session saved before
     // start times were kept) until it is finished.
@@ -157,12 +149,14 @@ fun SessionScreen(
         }
     }
 
-    fun log(ex: Exercise, before: ExerciseState, sets: List<Int>, effort: Effort) {
+    fun log(ex: Exercise, sets: List<Int>, effort: Effort) {
         val current = state.activeSession ?: return
+        val before = current.logged(ex.id)?.before ?: state.exerciseState(ex.id) ?: state.initialState(ex, day)
+        val earlier = records[ex.id]
         val next = Sessions.log(state, ex, sets, effort, day)
         val after = next.exerciseState(ex.id) ?: return
         val record = WorkoutRecord(
-                timestamp = System.currentTimeMillis(),
+                timestamp = earlier?.timestamp ?: System.currentTimeMillis(),
                 day = day,
                 session = current.number,
                 exerciseId = ex.id,
@@ -183,15 +177,25 @@ fun SessionScreen(
                 nextSets = after.sets,
                 capoeiraDay = state.isCapoeira(day),
             )
-        onRecord(record)
-        logged += Logged(ex, before, state.groupLastTrained[ex.group.name], record)
+        if (earlier != null) onRecordChanged(record) else onRecord(record)
+        records[ex.id] = record
         lastMessage = if (after.variation > before.variation) {
             "Level up! Next time: ${ex.variation(after.variation).name}."
         } else Mascot.logged(effort, System.currentTimeMillis())
         update(next)
     }
 
-    /** Re-does the progress for a logged exercise with corrected sets and feeling. */
+    // The summary's log: each exercise logged in the finished session, in workout order.
+    val logged: List<Logged> = finished?.let { f ->
+        f.exerciseIds.mapNotNull { id ->
+            val u = f.logged(id) ?: return@mapNotNull null
+            val ex = library.exercise(id) ?: return@mapNotNull null
+            val r = records[id] ?: return@mapNotNull null
+            Logged(ex, u.before, u.groupDayBefore, r)
+        }
+    }.orEmpty()
+
+    /** On the summary, re-does the progress for a logged exercise with corrected sets and feeling. */
     fun correct(index: Int, sets: List<Int>, effort: Effort) {
         val l = logged[index]
         val others = logged.any { it !== l && it.ex.group == l.ex.group && it.record.effort != Effort.SKIPPED }
@@ -205,7 +209,7 @@ fun SessionScreen(
             nextTarget = after.target,
             nextSets = after.sets,
         )
-        logged[index] = l.copy(record = record)
+        records[l.ex.id] = record
         onRecordChanged(record)
         update(next)
     }
@@ -213,17 +217,19 @@ fun SessionScreen(
     val shown = session ?: finished
     val startedAt = shown?.startedAt?.takeIf { it > 0 } ?: openedAt
     val planned = shown?.plannedCount ?: 0
-    val position = shown?.doneCount ?: 0
+    // The counter at the top: exercises logged. The one on screen is at [position].
+    val doneCount = shown?.doneCount ?: 0
+    val position = session?.position ?: planned
 
     // Each new exercise starts at the top of the screen, with its instructions.
     val scroll = rememberScrollState()
-    LaunchedEffect(position, session?.warmupDone, redo, restarts) { scroll.scrollTo(0) }
+    LaunchedEffect(position, session?.warmupDone, restarts) { scroll.scrollTo(0) }
 
     Column(Modifier.fillMaxSize().padding(top = 32.dp)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onQuit) { Icon(Icons.Filled.Close, contentDescription = "Stop") }
             LinearProgressIndicator(
-                progress = { if (planned == 0) 1f else position.toFloat() / planned },
+                progress = { if (planned == 0) 1f else doneCount.toFloat() / planned },
                 modifier = Modifier.weight(1f).height(10.dp),
                 color = Good,
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -232,7 +238,7 @@ fun SessionScreen(
                 gapSize = 0.dp,
             )
             Text(
-                "$position / $planned",
+                "$doneCount / $planned",
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(start = 10.dp),
             )
@@ -253,9 +259,8 @@ fun SessionScreen(
         if (paused.value && !done) {
             // Paused: continue, or move around the workout.
             val inWorkout = session?.warmupDone == true
-            val canBack = (redo ?: logged.size) > 0
-            // On the first exercise, with nothing logged yet, Back starts the whole workout over.
-            val canRestart = redo == null && position == 0
+            // On the first exercise, Back starts the whole workout over, from the warm-up.
+            val first = position == 0
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = { paused.value = false },
@@ -266,32 +271,27 @@ fun SessionScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = {
-                                if (canRestart) update(Sessions.restart(state))
-                                else redo = (redo ?: logged.size) - 1
+                                update(Sessions.back(state))
                                 lastMessage = null
                                 paused.value = false
                             },
-                            enabled = canBack || canRestart,
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp),
-                        ) { Text(if (canRestart) "⏮ Restart" else "⏮ Back", maxLines = 1) }
+                        ) { Text(if (first) "⏮ Restart" else "⏮ Back", maxLines = 1) }
                         OutlinedButton(
                             onClick = { restarts++; paused.value = false },
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp),
                         ) { Text("↺ Start over", maxLines = 1) }
                         OutlinedButton(
-                            // The same as "Skip / couldn't do it" on the exercise shown.
                             onClick = {
-                                speaker.stop()
-                                val r = redo
-                                if (r != null) {
-                                    correct(r, emptyList(), Effort.SKIPPED)
-                                    lastMessage = "Updated ${logged[r].ex.title}."
-                                    redo = (r + 1).takeIf { it < logged.size }
-                                } else exercise?.let { ex ->
-                                    log(ex, state.exerciseState(ex.id) ?: state.initialState(ex, day), emptyList(), Effort.SKIPPED)
+                                exercise?.let { ex ->
+                                    // Not logged yet: the same as "Skip / couldn't do it". Already
+                                    // logged (reached with Back): it keeps its result.
+                                    if (state.activeSession?.logged(ex.id) == null) log(ex, emptyList(), Effort.SKIPPED)
+                                    else update(Sessions.next(state, ex, day))
                                 }
+                                lastMessage = null
                                 paused.value = false
                             },
                             modifier = Modifier.weight(1f),
@@ -299,9 +299,10 @@ fun SessionScreen(
                         ) { Text("Next ⏭", maxLines = 1) }
                     }
                     Text(
-                        (if (canRestart) "Restart: the whole workout again, from the warm-up. "
-                        else "Back: do the previous exercise again; the new result replaces the old one. ") +
-                            "Start over: this exercise from its first set. Next: the same as Skip / couldn't do it.",
+                        (if (first) "Restart: the whole workout again, from the warm-up. "
+                        else "Back: the previous exercise again; doing it replaces its result. ") +
+                            "Start over: this exercise from its first set. Next: the same as Skip / " +
+                            "couldn't do it, or, for an exercise already done, keeps its result.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                     )
@@ -320,44 +321,29 @@ fun SessionScreen(
                     TodaysMuscles(todays)
                     WarmupView(library.warmup, speak = { if (state.readAloud) speaker.say(it) }) { update(Sessions.warmupDone(state)) }
                 }
-                redo != null -> {
-                    // Doing an earlier exercise again, from the state it had before its log.
-                    val r = redo!!
-                    val l = logged[r]
-                    Text(
-                        "Doing ${l.ex.title} again: this result replaces the earlier one.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline,
-                    )
-                    key(l.ex.id, "redo", r, restarts) {
-                        ExerciseView(
-                            l.ex, l.before, position - (logged.size - r), planned,
-                            history.filter { it.exerciseId == l.ex.id && it.day != day },
-                            again = true,
-                            readAloud = state.readAloud,
-                            speak = speaker::say,
-                            cue = speaker::interject,
-                        ) { sets, effort ->
-                            speaker.stop()
-                            correct(r, sets, effort)
-                            lastMessage = "Updated ${l.ex.title}."
-                            redo = (r + 1).takeIf { it < logged.size }
-                        }
-                    }
-                }
                 else -> {
                     val ex = exercise!!
-                    val es = state.exerciseState(ex.id) ?: state.initialState(ex, day)
+                    // An exercise reached with Back starts again from its state before its log.
+                    val earlier = session.logged(ex.id)
+                    val es = earlier?.before ?: state.exerciseState(ex.id) ?: state.initialState(ex, day)
                     lastMessage?.let { PipSays(Mood.HAPPY, it, size = 48.dp) }
+                    if (earlier != null) {
+                        Text(
+                            "Done already (${earlier.effort?.let(::effortLabel)?.lowercase() ?: "logged"}). Doing it again replaces that result; Next keeps it.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
                     key(ex.id, position, restarts) {
                         ExerciseView(
                             ex, es, position, planned, history.filter { it.exerciseId == ex.id && it.day != day },
+                            again = earlier != null,
                             readAloud = state.readAloud,
                             speak = speaker::say,
                             cue = speaker::interject,
                         ) { sets, effort ->
                             speaker.stop()
-                            log(ex, es, sets, effort)
+                            log(ex, sets, effort)
                         }
                     }
                 }

@@ -189,16 +189,6 @@ class CoreTest {
         assertEquals(1, state.streak(monday))
     }
 
-    @Test fun workoutRestartsOnlyBeforeAnythingIsLogged() {
-        val plan = SessionBuilder.build(library, AppState(), monday)
-        var state = Sessions.warmupDone(Sessions.start(library, AppState(), plan, monday, now = 1L))
-        val restarted = Sessions.restart(state, now = 2L).activeSession!!
-        assertEquals(false, restarted.warmupDone)
-        assertEquals(2L, restarted.startedAt)
-        state = Sessions.log(state, ex(plan.exerciseIds.first()), listOf(5, 5), Effort.OK, monday)
-        assertEquals(state, Sessions.restart(state, now = 3L))
-    }
-
     @Test fun sessionKeepsWhatBackNeeds() {
         val plan = SessionBuilder.build(library, AppState(), monday)
         var state = Sessions.start(library, AppState(), plan, monday)
@@ -206,7 +196,99 @@ class CoreTest {
         val before = state.exerciseState(first.id)!!
         val groupBefore = state.groupLastTrained[first.group.name]
         state = Sessions.log(state, first, listOf(5, 5), Effort.OK, monday)
-        assertEquals(listOf(Undo(first.id, before, groupBefore)), state.activeSession!!.undo)
+        val u = state.activeSession!!.logged(first.id)!!
+        assertEquals(before, u.before)
+        assertEquals(groupBefore, u.groupDayBefore)
+        assertEquals(Effort.OK, u.effort)
+    }
+
+    /** Logs the exercise on screen in full, at its target. */
+    private fun doIt(state: AppState, day: Day, effort: Effort = Effort.OK): AppState {
+        val e = ex(state.activeSession!!.next()!!)
+        val es = state.activeSession!!.logged(e.id)?.before ?: state.exerciseState(e.id)!!
+        return Sessions.log(state, e, List(es.sets) { es.target }, effort, day)
+    }
+
+    @Test fun jumpAheadThenBackToTheStartThenFinish() {
+        // A few sessions in, so the plan has several exercises and some history.
+        var base = AppState()
+        var day = monday
+        repeat(4) {
+            val p = SessionBuilder.build(library, base, day)
+            base = Sessions.warmupDone(Sessions.start(library, base, p, day))
+            while (!base.activeSession!!.finished) base = doIt(base, day)
+            base = Sessions.finish(library, base, day)
+            day++
+        }
+        val plan = SessionBuilder.build(library, base, day)
+        val n = plan.exerciseIds.size
+        assertTrue(n >= 4, "plan has $n exercises")
+        val started = Sessions.warmupDone(Sessions.start(library, base, plan, day, now = 100L))
+
+        // The reference: the same workout done straight through.
+        var straight = started
+        while (!straight.activeSession!!.finished) straight = doIt(straight, day)
+
+        var state = started
+        fun session() = state.activeSession!!
+        // Next three times: each is skipped, like "Skip / couldn't do it".
+        repeat(3) { k ->
+            state = Sessions.next(state, ex(session().next()!!), day)
+            assertEquals(k + 1, session().position)
+            assertEquals(k + 1, session().doneCount)
+            assertEquals(k + 1, session().skipped)
+        }
+        // Back three times: to the first exercise. Nothing logged changes.
+        repeat(3) { k ->
+            state = Sessions.back(state, now = 200L)
+            assertEquals(2 - k, session().position)
+            assertEquals(3, session().doneCount)
+            assertTrue(session().warmupDone)
+        }
+        assertEquals(plan.exerciseIds.first(), session().next())
+        // Back on the first exercise: the whole workout again, from the warm-up. The clock keeps
+        // running, since exercises are logged.
+        state = Sessions.back(state, now = 300L)
+        assertEquals(0, session().position)
+        assertEquals(false, session().warmupDone)
+        assertEquals(100L, session().startedAt)
+        assertEquals(3, session().doneCount)
+        state = Sessions.warmupDone(state)
+        // Now done properly from the start: each skipped log is replaced, and the counter only
+        // grows for exercises not logged before.
+        for (k in 0 until n) {
+            state = doIt(state, day)
+            assertEquals(k + 1, session().position)
+            assertEquals(maxOf(3, k + 1), session().doneCount)
+        }
+        assertTrue(session().finished)
+        assertEquals(0, session().skipped)
+        assertEquals(n, session().undo.size)
+        // The same result as doing it straight through: progress, muscle groups and counts.
+        assertEquals(straight.exercises, state.exercises)
+        assertEquals(straight.groupLastTrained, state.groupLastTrained)
+        assertEquals(straight.activeSession!!.copy(startedAt = 0), session().copy(startedAt = 0))
+    }
+
+    @Test fun nextKeepsAnExerciseAlreadyDone() {
+        val plan = SessionBuilder.build(library, AppState(), monday)
+        var state = Sessions.warmupDone(Sessions.start(library, AppState(), plan, monday))
+        state = doIt(state, monday, Effort.EASY)
+        val done = state.exercises
+        state = Sessions.back(state)
+        state = Sessions.next(state, ex(state.activeSession!!.next()!!), monday)
+        assertEquals(done, state.exercises)
+        assertEquals(1, state.activeSession!!.position)
+        assertEquals(1, state.activeSession!!.easy)
+        assertEquals(0, state.activeSession!!.skipped)
+    }
+
+    @Test fun restartBeforeAnythingIsLoggedRestartsTheClock() {
+        val plan = SessionBuilder.build(library, AppState(), monday)
+        var state = Sessions.warmupDone(Sessions.start(library, AppState(), plan, monday, now = 1L))
+        state = Sessions.back(state, now = 2L)
+        assertEquals(false, state.activeSession!!.warmupDone)
+        assertEquals(2L, state.activeSession!!.startedAt)
     }
 
     @Test fun loggedExerciseCanBeCorrected() {

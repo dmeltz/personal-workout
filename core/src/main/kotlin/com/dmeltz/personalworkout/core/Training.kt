@@ -166,7 +166,7 @@ object Migrations {
         }
         // Exercises taken out of the library (bag rounds, 2026-11-07) leave today's unfinished session.
         s.activeSession?.let { a ->
-            val keep = a.exerciseIds.filterIndexed { i, id -> i < a.position || library.exercise(id) != null }
+            val keep = a.exerciseIds.filterIndexed { i, id -> i < a.position || library.exercise(id) != null || a.logged(id) != null }
             if (keep.size != a.exerciseIds.size) s = s.copy(activeSession = a.copy(exerciseIds = keep))
         }
         return s.copy(version = CURRENT)
