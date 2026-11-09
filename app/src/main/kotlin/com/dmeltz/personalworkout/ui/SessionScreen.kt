@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -95,8 +96,10 @@ fun SessionScreen(
     history: List<WorkoutRecord>,
     onState: (AppState) -> Unit,
     onRecord: (WorkoutRecord) -> Unit,
-    /** A logged exercise corrected on the summary. */
+    /** A logged exercise corrected on the summary, or done again after Back. */
     onRecordChanged: (WorkoutRecord) -> Unit,
+    /** Log records cleared by restarting the workout. */
+    onRecordsDeleted: (List<WorkoutRecord>) -> Unit,
     onFinished: () -> Unit,
     onQuit: () -> Unit,
 ) {
@@ -217,9 +220,15 @@ fun SessionScreen(
     val shown = session ?: finished
     val startedAt = shown?.startedAt?.takeIf { it > 0 } ?: openedAt
     val planned = shown?.plannedCount ?: 0
-    // The counter at the top: exercises logged. The one on screen is at [position].
-    val doneCount = shown?.doneCount ?: 0
+    // The exercise on screen (all of them once finished). The counter at the top follows it,
+    // backwards too: 0 during the warm-up, then its number.
     val position = session?.position ?: planned
+    val counter = when {
+        session == null || done -> planned
+        !session.warmupDone -> 0
+        else -> position + 1
+    }
+    var confirmRestart by remember { mutableStateOf(false) }
 
     // Each new exercise starts at the top of the screen, with its instructions.
     val scroll = rememberScrollState()
@@ -229,7 +238,7 @@ fun SessionScreen(
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onQuit) { Icon(Icons.Filled.Close, contentDescription = "Stop") }
             LinearProgressIndicator(
-                progress = { if (planned == 0) 1f else doneCount.toFloat() / planned },
+                progress = { if (planned == 0) 1f else (if (done) planned else position).toFloat() / planned },
                 modifier = Modifier.weight(1f).height(10.dp),
                 color = Good,
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -238,7 +247,7 @@ fun SessionScreen(
                 gapSize = 0.dp,
             )
             Text(
-                "$doneCount / $planned",
+                "$counter / $planned",
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(start = 10.dp),
             )
@@ -259,7 +268,6 @@ fun SessionScreen(
         if (paused.value && !done) {
             // Paused: continue, or move around the workout.
             val inWorkout = session?.warmupDone == true
-            // On the first exercise, Back starts the whole workout over, from the warm-up.
             val first = position == 0
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
@@ -275,9 +283,10 @@ fun SessionScreen(
                                 lastMessage = null
                                 paused.value = false
                             },
+                            enabled = !first,
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp),
-                        ) { Text(if (first) "⏮ Restart" else "⏮ Back", maxLines = 1) }
+                        ) { Text("⏮ Back", maxLines = 1) }
                         OutlinedButton(
                             onClick = { restarts++; paused.value = false },
                             modifier = Modifier.weight(1f),
@@ -299,15 +308,37 @@ fun SessionScreen(
                         ) { Text("Next ⏭", maxLines = 1) }
                     }
                     Text(
-                        (if (first) "Restart: the whole workout again, from the warm-up. "
-                        else "Back: the previous exercise again; doing it replaces its result. ") +
+                        "Back: the previous exercise again; doing it replaces its result. " +
                             "Start over: this exercise from its first set. Next: the same as Skip / " +
                             "couldn't do it, or, for an exercise already done, keeps its result.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                     )
                 }
+                OutlinedButton(onClick = { confirmRestart = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("⟲ Restart the whole workout")
+                }
             }
+        }
+        if (confirmRestart) {
+            AlertDialog(
+                onDismissRequest = { confirmRestart = false },
+                title = { Text("Restart the workout?") },
+                text = { Text("Everything logged in this workout is cleared, and it starts again from the warm-up with the timer at zero.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmRestart = false
+                        speaker.stop()
+                        onRecordsDeleted(records.values.toList())
+                        records.clear()
+                        lastMessage = null
+                        restarts++
+                        update(Sessions.restart(state))
+                        paused.value = false
+                    }) { Text("Restart") }
+                },
+                dismissButton = { TextButton(onClick = { confirmRestart = false }) { Text("Cancel") } },
+            )
         }
         CompositionLocalProvider(LocalPaused provides paused) { Column(
             Modifier.fillMaxSize().verticalScroll(scroll).padding(20.dp),
@@ -319,7 +350,9 @@ fun SessionScreen(
                     val todays = session.exerciseIds.mapNotNull { library.exercise(it) }
                     TodaysPlan(todays, library.warmup, state, day)
                     TodaysMuscles(todays)
-                    WarmupView(library.warmup, speak = { if (state.readAloud) speaker.say(it) }) { update(Sessions.warmupDone(state)) }
+                    key(restarts) {
+                        WarmupView(library.warmup, speak = { if (state.readAloud) speaker.say(it) }) { update(Sessions.warmupDone(state)) }
+                    }
                 }
                 else -> {
                     val ex = exercise!!

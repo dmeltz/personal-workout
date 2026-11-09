@@ -73,27 +73,37 @@ object Sessions {
     fun warmupDone(state: AppState): AppState =
         state.copy(activeSession = state.activeSession?.copy(warmupDone = true))
 
-    /**
-     * Back: the previous exercise comes up again, and logging it replaces its result. On the
-     * first exercise, the whole workout starts over from the warm-up instead (see [restart]).
-     */
-    fun back(state: AppState, now: Long = System.currentTimeMillis()): AppState {
+    /** Back: the previous exercise comes up again, and logging it replaces its result. */
+    fun back(state: AppState): AppState {
         val session = state.activeSession ?: return state
-        if (session.position <= 0) return restart(state, now)
+        if (session.position <= 0) return state
         return state.copy(activeSession = session.copy(position = (session.position - 1).coerceAtMost(session.exerciseIds.size - 1)))
     }
 
     /**
-     * Back on the first exercise: the warm-up again, then the exercises from the first one.
-     * Whatever is logged stays logged until it is done again; the clock restarts only when nothing is.
+     * Restarts the workout completely: every log in it is undone (each exercise back to its state
+     * before, each muscle group to its last training day before), and it starts again from the
+     * warm-up with the clock at zero. The app deletes the workout's log records to match.
      */
     fun restart(state: AppState, now: Long = System.currentTimeMillis()): AppState {
         val session = state.activeSession ?: return state
+        var groups = state.groupLastTrained
+        for (u in session.undo.asReversed()) {
+            val g = u.group ?: continue
+            groups = if (u.groupDayBefore == null) groups - g else groups + (g to u.groupDayBefore)
+        }
         return state.copy(
+            exercises = state.exercises + session.undo.associate { it.exerciseId to it.before },
+            groupLastTrained = groups,
             activeSession = session.copy(
                 position = 0,
                 warmupDone = false,
-                startedAt = if (session.undo.isEmpty()) now else session.startedAt,
+                startedAt = now,
+                undo = emptyList(),
+                easy = 0,
+                hard = 0,
+                skipped = 0,
+                levelledUp = emptyList(),
             ),
         )
     }
