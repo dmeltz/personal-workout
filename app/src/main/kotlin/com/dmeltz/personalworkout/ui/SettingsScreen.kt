@@ -60,7 +60,7 @@ fun SettingsScreen(
 
             HorizontalDivider()
             Text("Rest days", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("Planned rest days don't break your streak.")
+            Text("None by default: there's a workout every day. Planned rest days don't break your streak.")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 WEEKDAYS.forEachIndexed { i, name ->
                     val wd = i + 1
@@ -69,23 +69,6 @@ fun SettingsScreen(
                         onClick = {
                             val days = if (wd in state.restWeekdays) state.restWeekdays - wd else (state.restWeekdays + wd).sorted()
                             onState(state.copy(restWeekdays = days))
-                        },
-                        label = { Text(name) },
-                    )
-                }
-            }
-
-            HorizontalDivider()
-            Text("Capoeira days", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("Every week on these days, the plan expects capoeira: a short session with no legs. Switch a single day on or off on the home screen.")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                WEEKDAYS.forEachIndexed { i, name ->
-                    val wd = i + 1
-                    FilterChip(
-                        selected = wd in state.capoeiraWeekdays,
-                        onClick = {
-                            val days = if (wd in state.capoeiraWeekdays) state.capoeiraWeekdays - wd else (state.capoeiraWeekdays + wd).sorted()
-                            onState(state.copy(capoeiraWeekdays = days))
                         },
                         label = { Text(name) },
                     )

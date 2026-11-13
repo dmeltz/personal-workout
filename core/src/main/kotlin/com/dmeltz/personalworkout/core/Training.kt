@@ -41,8 +41,8 @@ data class AppState(
     val sessionDays: List<Day> = emptyList(),
     /** Days marked as capoeira days, ascending, besides the weekly ones. */
     val capoeiraDays: List<Day> = emptyList(),
-    /** Weekly capoeira days, 1 = Monday ... 7 = Sunday. Daniel's are Thursday and Sunday. */
-    val capoeiraWeekdays: List<Int> = listOf(4, 7),
+    /** Weekly capoeira days, 1 = Monday ... 7 = Sunday. None since 2026-11-13: Daniel trains every day. */
+    val capoeiraWeekdays: List<Int> = emptyList(),
     /** Weekly capoeira days switched off (no capoeira that week), ascending. */
     val noCapoeiraDays: List<Day> = emptyList(),
     /** Last day each muscle group was trained, by [Group] name. */
@@ -50,8 +50,10 @@ data class AppState(
     /** Overall and per-group level at the end of each training day. */
     val levelHistory: List<LevelPoint> = emptyList(),
     val sessionsCompleted: Int = 0,
-    /** Planned rest days, 1 = Monday ... 7 = Sunday. They don't break the streak. */
-    val restWeekdays: List<Int> = listOf(6),
+    /** Planned rest days, 1 = Monday ... 7 = Sunday. They don't break the streak. None by default: training every day. */
+    val restWeekdays: List<Int> = emptyList(),
+    /** Past rest days from when there were weekly ones, so they still don't break the streak. */
+    val restDays: List<Day> = emptyList(),
     val reminderHour: Int = 19,
     val reminderMinute: Int = 0,
     val reminderEnabled: Boolean = true,
@@ -86,7 +88,7 @@ data class AppState(
     fun isCapoeira(day: Day): Boolean = capoeiraDays.binarySearch(day) >= 0 ||
         (weekday(day) in capoeiraWeekdays && noCapoeiraDays.binarySearch(day) < 0)
 
-    fun isRestDay(day: Day): Boolean = weekday(day) in restWeekdays
+    fun isRestDay(day: Day): Boolean = weekday(day) in restWeekdays || restDays.binarySearch(day) >= 0
 
     /** A planned day is done with a session, or with capoeira. */
     fun dayDone(day: Day): Boolean = trainedOn(day) || isCapoeira(day)
@@ -145,9 +147,9 @@ const val WEIGH_IN_DAYS = 7
 
 /** Updates a saved state to the current exercise library. */
 object Migrations {
-    const val CURRENT = 2
+    const val CURRENT = 3
 
-    fun run(library: Library, state: AppState): AppState {
+    fun run(library: Library, state: AppState, today: Day = java.time.LocalDate.now().toEpochDay()): AppState {
         var s = state
         if (s.version < 1) {
             // Version 1: alternating moves (dead bug, bird dog, archer push-up, Cossack squat) count per
@@ -162,6 +164,21 @@ object Migrations {
             s = s.copy(
                 exercises = s.exercises.mapValues { (id, es) -> library.exercise(id)?.let { es.copy(sets = it.sets) } ?: es },
                 startLevels = s.startLevels.mapValues { (id, l) -> library.exercise(id)?.let { l.copy(sets = it.sets) } ?: l },
+            )
+        }
+        if (s.version < 3) {
+            // Version 3 (2026-11-13): no weekly capoeira or rest days; Daniel trains every day. Past
+            // weekly capoeira and rest days are kept as dates, so the streak doesn't change.
+            val first = listOfNotNull(s.sessionDays.firstOrNull(), s.capoeiraDays.firstOrNull()).minOrNull()
+            val past = if (first == null) emptyList() else (first until today).toList()
+            val capoeira = past.filter { weekday(it) in s.capoeiraWeekdays && s.noCapoeiraDays.binarySearch(it) < 0 }
+            val rest = past.filter { weekday(it) in s.restWeekdays }
+            s = s.copy(
+                capoeiraDays = (s.capoeiraDays + capoeira).distinct().sorted(),
+                capoeiraWeekdays = emptyList(),
+                noCapoeiraDays = emptyList(),
+                restDays = (s.restDays + rest).distinct().sorted(),
+                restWeekdays = emptyList(),
             )
         }
         // Exercises taken out of the library (bag rounds, 2026-11-07) leave today's unfinished session.

@@ -126,9 +126,7 @@ fun SessionScreen(
     // "Start over" runs the current exercise again from its first set.
     var restarts by remember { mutableIntStateOf(0) }
 
-    // The overall clock: from the session's start (or this screen's, for a session saved before
-    // start times were kept) until it is finished.
-    val openedAt = remember { System.currentTimeMillis() }
+    // The overall clock: from "Start the workout" (or skipping the warm-up) until it is finished.
     var endedAt by remember { mutableStateOf<Long?>(null) }
 
     // The screen stays on while training.
@@ -218,7 +216,8 @@ fun SessionScreen(
     }
 
     val shown = session ?: finished
-    val startedAt = shown?.startedAt?.takeIf { it > 0 } ?: openedAt
+    // The timer waits until the warm-up starts (or is skipped).
+    val startedAt = shown?.startedAt?.takeIf { it > 0 }
     val planned = shown?.plannedCount ?: 0
     // The exercise on screen (all of them once finished). The counter at the top follows it,
     // backwards too: 0 during the warm-up, then its number.
@@ -345,13 +344,17 @@ fun SessionScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             when {
-                done -> DoneView(finished ?: session, state, library, ((endedAt ?: startedAt) - startedAt) / 1000, logged, ::correct, onFinished)
+                done -> DoneView(finished ?: session, state, library, if (startedAt == null) 0 else ((endedAt ?: startedAt) - startedAt) / 1000, logged, ::correct, onFinished)
                 !session!!.warmupDone -> {
                     val todays = session.exerciseIds.mapNotNull { library.exercise(it) }
                     TodaysPlan(todays, library.warmup, state, day)
                     TodaysMuscles(todays)
                     key(restarts) {
-                        WarmupView(library.warmup, speak = { if (state.readAloud) speaker.say(it) }) { update(Sessions.warmupDone(state)) }
+                        WarmupView(
+                            library.warmup,
+                            speak = { if (state.readAloud) speaker.say(it) },
+                            onStart = { update(Sessions.begin(state)) },
+                        ) { update(Sessions.warmupDone(state)) }
                     }
                 }
                 else -> {
@@ -467,7 +470,7 @@ fun ExerciseMuscles(ex: Exercise) {
 }
 
 @Composable
-private fun WarmupView(moves: List<WarmupMove>, speak: (String) -> Unit, onDoneClick: () -> Unit) {
+private fun WarmupView(moves: List<WarmupMove>, speak: (String) -> Unit, onStart: () -> Unit, onDoneClick: () -> Unit) {
     val paused = LocalPaused.current
     val onDone by rememberUpdatedState(onDoneClick)
     var index by remember { mutableIntStateOf(-1) }
@@ -511,7 +514,7 @@ private fun WarmupView(moves: List<WarmupMove>, speak: (String) -> Unit, onDoneC
         }
     }
     if (index < 0) {
-        Button(onClick = { index = 0 }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Start the warm-up timer") }
+        Button(onClick = { onStart(); index = 0 }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Start the workout") }
     }
     OutlinedButton(onClick = { onDone() }, modifier = Modifier.fillMaxWidth().height(48.dp)) {
         Text(if (index < 0) "Already warm, skip it" else "Done, let's train")
@@ -962,9 +965,12 @@ private fun EffortButton(label: String, color: Color, modifier: Modifier, onClic
 /** A logged exercise, with its state and its group's last training day from before the log. */
 private data class Logged(val ex: Exercise, val before: ExerciseState, val groupDayBefore: Day?, val record: WorkoutRecord)
 
-/** The time since [startedAt], ticking each second until [endedAt]. It owns its ticker so the rest of the screen doesn't redraw every second. */
+/**
+ * The time since [startedAt], ticking each second until [endedAt]; 0:00 until the workout starts.
+ * It owns its ticker so the rest of the screen doesn't redraw every second.
+ */
 @Composable
-private fun SessionClock(startedAt: Long, endedAt: Long?, modifier: Modifier) {
+private fun SessionClock(startedAt: Long?, endedAt: Long?, modifier: Modifier) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(endedAt) {
         while (endedAt == null) {
@@ -973,7 +979,7 @@ private fun SessionClock(startedAt: Long, endedAt: Long?, modifier: Modifier) {
         }
     }
     Text(
-        clock(((endedAt ?: now) - startedAt).coerceAtLeast(0) / 1000),
+        clock(if (startedAt == null) 0 else ((endedAt ?: now) - startedAt).coerceAtLeast(0) / 1000),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = if (endedAt == null) MaterialTheme.colorScheme.onSurface else Good,

@@ -124,6 +124,7 @@ class MainActivity : ComponentActivity() {
                     Screen.Progress -> ProgressScreen(
                         state = state,
                         library = repo.library,
+                        records = remember(screen, state) { repo.records() },
                         onState = ::update,
                         onExercise = { push(Screen.Exercise(it)) },
                         onHistory = { push(Screen.History) },
