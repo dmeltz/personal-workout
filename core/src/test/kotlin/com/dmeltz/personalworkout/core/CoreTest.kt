@@ -115,13 +115,35 @@ class CoreTest {
     }
 
     @Test fun restDaysDontBreakTheStreak() {
-        // Saturday is the default rest day.
-        val state = AppState(sessionDays = listOf(monday + 3, monday + 4, monday + 6))
+        // Saturday as a rest day.
+        val state = AppState(sessionDays = listOf(monday + 3, monday + 4, monday + 6), restWeekdays = listOf(6))
         assertEquals(3, state.streak(monday + 6))
         // Monday not done yet: the streak still stands.
         assertEquals(3, state.streak(monday + 7))
         // Missing Monday breaks it by Tuesday.
         assertEquals(0, state.streak(monday + 8))
+    }
+
+    @Test fun everyDayMigrationKeepsTheStreak() {
+        // Sessions Monday to Wednesday, weekly capoeira Thursday, a session Friday, weekly rest
+        // Saturday, weekly capoeira Sunday, a session Monday: 7 days in a row (rest doesn't count).
+        val old = AppState(
+            version = 2,
+            sessionDays = listOf(monday, monday + 1, monday + 2, monday + 4, monday + 7),
+            capoeiraWeekdays = listOf(4, 7),
+            restWeekdays = listOf(6),
+        )
+        val today = monday + 8
+        assertEquals(7, old.streak(today - 1))
+        val new = Migrations.run(library, old, today)
+        assertEquals(emptyList(), new.capoeiraWeekdays)
+        assertEquals(emptyList(), new.restWeekdays)
+        assertEquals(old.streak(today - 1), new.streak(today - 1))
+        assertEquals(listOf(monday + 3, monday + 6), new.capoeiraDays)
+        // From now on every day counts: no session today and tomorrow breaks it.
+        assertEquals(0, new.streak(today + 1))
+        assertEquals(DayKind.NORMAL, SessionBuilder.dayKind(new, today + 3))
+        assertEquals(DayKind.NORMAL, SessionBuilder.dayKind(new, today + 5))
     }
 
     @Test fun capoeiraCountsForTheStreak() {
@@ -173,7 +195,8 @@ class CoreTest {
             assertTrue((counts[g] ?: 0) >= 4, "$g only ${counts[g]} times in two weeks")
         }
         assertTrue(state.exercises.size > library.exercises.count { it.intro == 1 }, "no new exercises in two weeks")
-        assertEquals(12, state.streak(monday + 13))
+        // Every day is a training day.
+        assertEquals(14, state.streak(monday + 13))
     }
 
     @Test fun sessionLogsAndFinishes() {
@@ -223,7 +246,7 @@ class CoreTest {
         val plan = SessionBuilder.build(library, base, day)
         val n = plan.exerciseIds.size
         assertTrue(n >= 4, "plan has $n exercises")
-        val started = Sessions.warmupDone(Sessions.start(library, base, plan, day, now = 100L))
+        val started = Sessions.warmupDone(Sessions.start(library, base, plan, day), now = 100L)
 
         // The reference: the same workout done straight through.
         var straight = started
@@ -274,23 +297,23 @@ class CoreTest {
             day++
         }
         val plan = SessionBuilder.build(library, base, day)
-        val started = Sessions.warmupDone(Sessions.start(library, base, plan, day, now = 100L))
+        val started = Sessions.warmupDone(Sessions.start(library, base, plan, day), now = 100L)
         var state = started
         state = doIt(state, day, Effort.EASY)
         state = Sessions.next(state, ex(state.activeSession!!.next()!!), day)
         state = doIt(state, day, Effort.HARD)
         state = Sessions.back(state)
-        state = Sessions.restart(state, now = 500L)
+        state = Sessions.restart(state)
         val s = state.activeSession!!
         assertEquals(0, s.position)
         assertEquals(false, s.warmupDone)
-        assertEquals(500L, s.startedAt)
+        assertEquals(0L, s.startedAt)
         assertEquals(0, s.doneCount)
         assertEquals(listOf(0, 0, 0), listOf(s.easy, s.hard, s.skipped))
         // Everything is as it was when the workout started.
         assertEquals(started.exercises, state.exercises)
         assertEquals(started.groupLastTrained, state.groupLastTrained)
-        assertEquals(started.activeSession!!.copy(warmupDone = false, startedAt = 500L), s)
+        assertEquals(started.activeSession!!.copy(warmupDone = false, startedAt = 0), s)
     }
 
     @Test fun nextKeepsAnExerciseAlreadyDone() {
@@ -308,8 +331,12 @@ class CoreTest {
 
     @Test fun loggedExerciseCanBeCorrected() {
         val plan = SessionBuilder.build(library, AppState(), monday)
-        var state = Sessions.start(library, AppState(), plan, monday, now = 1234L)
+        var state = Sessions.start(library, AppState(), plan, monday)
+        // The timer waits until the workout begins.
+        assertEquals(0L, state.activeSession!!.startedAt)
+        state = Sessions.begin(state, now = 1234L)
         assertEquals(1234L, state.activeSession!!.startedAt)
+        assertEquals(1234L, Sessions.warmupDone(Sessions.begin(state, now = 2000L), now = 3000L).activeSession!!.startedAt)
         val first = ex(plan.exerciseIds.first())
         val before = state.exerciseState(first.id)!!
         val groupBefore = state.groupLastTrained[first.group.name]

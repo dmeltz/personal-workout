@@ -97,17 +97,6 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(20.dp))
 
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Capoeira today", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Counts for the streak. Today's session gets short and skips legs.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                Switch(checked = state.isCapoeira(day), onCheckedChange = { onState(Sessions.setCapoeira(state, day, it)) })
-            }
-            Spacer(Modifier.height(16.dp))
 
             val unfinished = state.sessionToContinue(day)
             val plan = if (unfinished == null && kind != DayKind.REST) SessionBuilder.build(library, state, day) else null

@@ -21,7 +21,7 @@ data class ActiveSession(
     val skipped: Int = 0,
     /** Exercises whose variation went up during this session. */
     val levelledUp: List<String> = emptyList(),
-    /** When the session started, in epoch milliseconds (0 for a session saved before this was kept). */
+    /** When the workout timer started, in epoch milliseconds: 0 until the user starts the warm-up (or skips it). */
     val startedAt: Long = 0,
     /** Each exercise logged so far, once each, with what is needed to log it again after Back. */
     val undo: List<Undo> = emptyList(),
@@ -54,8 +54,8 @@ fun AppState.sessionToContinue(today: Day): ActiveSession? =
     activeSession?.takeIf { it.day == today && !it.finished }
 
 object Sessions {
-    /** Starts a session: its new exercises count as started from now. */
-    fun start(library: Library, state: AppState, plan: SessionPlan, today: Day, now: Long = System.currentTimeMillis()): AppState {
+    /** Opens a session: its new exercises count as started from now. The timer waits for [begin]. */
+    fun start(library: Library, state: AppState, plan: SessionPlan, today: Day): AppState {
         val started = plan.startIds.mapNotNull { library.exercise(it) }
             .associate { it.id to state.initialState(it, today) }
         return state.copy(
@@ -65,13 +65,22 @@ object Sessions {
                 number = state.sessionsCompleted + 1,
                 kind = plan.kind,
                 exerciseIds = plan.exerciseIds,
-                startedAt = now,
             ),
         )
     }
 
-    fun warmupDone(state: AppState): AppState =
-        state.copy(activeSession = state.activeSession?.copy(warmupDone = true))
+    /** The user starts the workout: the timer starts, unless it already runs. */
+    fun begin(state: AppState, now: Long = System.currentTimeMillis()): AppState {
+        val session = state.activeSession ?: return state
+        if (session.startedAt > 0) return state
+        return state.copy(activeSession = session.copy(startedAt = now))
+    }
+
+    /** The warm-up is done (or skipped): the exercises come next, and the timer runs. */
+    fun warmupDone(state: AppState, now: Long = System.currentTimeMillis()): AppState {
+        val begun = begin(state, now)
+        return begun.copy(activeSession = begun.activeSession?.copy(warmupDone = true))
+    }
 
     /** Back: the previous exercise comes up again, and logging it replaces its result. */
     fun back(state: AppState): AppState {
@@ -83,9 +92,9 @@ object Sessions {
     /**
      * Restarts the workout completely: every log in it is undone (each exercise back to its state
      * before, each muscle group to its last training day before), and it starts again from the
-     * warm-up with the clock at zero. The app deletes the workout's log records to match.
+     * warm-up with the timer at zero, waiting for [begin]. The app deletes the workout's log records to match.
      */
-    fun restart(state: AppState, now: Long = System.currentTimeMillis()): AppState {
+    fun restart(state: AppState): AppState {
         val session = state.activeSession ?: return state
         var groups = state.groupLastTrained
         for (u in session.undo.asReversed()) {
@@ -98,7 +107,7 @@ object Sessions {
             activeSession = session.copy(
                 position = 0,
                 warmupDone = false,
-                startedAt = now,
+                startedAt = 0,
                 undo = emptyList(),
                 easy = 0,
                 hard = 0,

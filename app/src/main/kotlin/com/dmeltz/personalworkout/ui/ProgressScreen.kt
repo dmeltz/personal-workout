@@ -56,6 +56,7 @@ import com.dmeltz.personalworkout.core.Muscle
 import com.dmeltz.personalworkout.core.Progression
 import com.dmeltz.personalworkout.core.Planner
 import com.dmeltz.personalworkout.core.DayKind
+import com.dmeltz.personalworkout.core.WorkoutRecord
 import androidx.compose.ui.draw.drawBehind
 import com.dmeltz.personalworkout.today
 import java.time.LocalDate
@@ -77,6 +78,8 @@ val groupColors = mapOf(
 fun ProgressScreen(
     state: AppState,
     library: Library,
+    /** Every logged exercise, for yesterday's and today's columns in the plan table. */
+    records: List<WorkoutRecord>,
     onState: (AppState) -> Unit,
     onExercise: (String) -> Unit,
     onHistory: () -> Unit,
@@ -170,7 +173,7 @@ fun ProgressScreen(
                     }
                 }
             }
-            item { MuscleStatus(state, library, day, selGroup, selMuscle, litMuscles, ::pickMuscle, onExercise) }
+            item { MuscleStatus(state, library, records, day, selGroup, selMuscle, litMuscles, ::pickMuscle, onExercise) }
             item {
                 Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -249,6 +252,7 @@ private fun lerp(a: Color, b: Color, t: Float) = Color(
 private fun MuscleStatus(
     state: AppState,
     library: Library,
+    records: List<WorkoutRecord>,
     day: Day,
     selGroup: Group?,
     selected: Muscle?,
@@ -298,7 +302,7 @@ private fun MuscleStatus(
                 LegendDot(NotStarted, "Not started")
             }
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
-            MuscleDayGrid(state, library, levels, colors, lit, onPick, onExercise)
+            MuscleDayGrid(state, library, records, levels, colors, lit, onPick, onExercise)
         }
     }
 }
@@ -321,13 +325,15 @@ private val StrengthColor = Color.White
 private fun MuscleDayGrid(
     state: AppState,
     library: Library,
+    records: List<WorkoutRecord>,
     levels: Map<Muscle, Double?>,
     colors: Map<Muscle, Color>,
     lit: Set<Muscle>,
     onPick: (Muscle?) -> Unit,
     onExercise: (String) -> Unit,
 ) {
-    val plan = remember(state) { Planner.nextDays(library, state, today(), 10) }
+    // Yesterday and today as they went, then the forecast.
+    val plan = remember(state, records) { Planner.window(library, state, records, today(), 11) }
     // For each muscle and day, the planned exercises that mainly work it: strength exercises first,
     // then the cooldown stretches that mainly stretch it.
     val cells: Map<Muscle, List<List<Pair<Exercise, Planner.Item>>>> = remember(plan) {
@@ -341,8 +347,9 @@ private fun MuscleDayGrid(
     // Only strength work counts as working a muscle; stretches don't.
     val missed = Muscle.entries.filter { m -> cells.getValue(m).all { day -> day.none { it.first.group.strength } } }
     Text(
-        "Next 10 days: tap an exercise to open it. Swipe sideways for more days. A forecast that " +
-            "assumes each planned exercise is done in full and rated OK.",
+        "Yesterday, today and the next 9 days: tap an exercise to open it. Swipe sideways for more " +
+            "days. Days marked ✓ show what you did; the rest is a forecast that assumes each planned " +
+            "exercise is done in full and rated OK.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.outline,
     )
@@ -360,8 +367,8 @@ private fun MuscleDayGrid(
         }
     }
     Text(
-        if (missed.isEmpty()) "✓ Every muscle is worked in the next 10 days."
-        else "Not worked in the next 10 days: ${missed.joinToString { it.label.lowercase() }}.",
+        if (missed.isEmpty()) "✓ Every muscle is worked in these 11 days."
+        else "Not worked in these 11 days: ${missed.joinToString { it.label.lowercase() }}.",
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         color = if (missed.isEmpty()) MuscleHigh else Missed,
@@ -419,18 +426,23 @@ private fun MuscleDayGrid(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            if (d.day == today()) "Today" else date.format(weekday),
+                            when (d.day - today()) {
+                                0L -> "Today"
+                                -1L -> "Yest."
+                                else -> date.format(weekday)
+                            },
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            when (d.kind) {
-                                DayKind.REST -> "Rest"
-                                DayKind.CAPOEIRA -> "Capo."
+                            when {
+                                d.done -> "✓ done"
+                                d.kind == DayKind.REST -> "Rest"
+                                d.kind == DayKind.CAPOEIRA -> "Capo."
                                 else -> date.format(dayOfMonth)
                             },
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline,
+                            color = if (d.done) MuscleHigh else MaterialTheme.colorScheme.outline,
                         )
                     }
                 }
