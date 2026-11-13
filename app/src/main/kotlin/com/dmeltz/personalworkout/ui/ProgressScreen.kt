@@ -173,7 +173,7 @@ fun ProgressScreen(
                     }
                 }
             }
-            item { MuscleStatus(state, library, day, selGroup, selMuscle, litMuscles, ::pickMuscle, onExercise) }
+            item { MuscleStatus(state, library, records, day, selGroup, selMuscle, litMuscles, ::pickMuscle, onExercise) }
             item {
                 Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -252,6 +252,7 @@ private fun lerp(a: Color, b: Color, t: Float) = Color(
 private fun MuscleStatus(
     state: AppState,
     library: Library,
+    records: List<WorkoutRecord>,
     day: Day,
     selGroup: Group?,
     selected: Muscle?,
