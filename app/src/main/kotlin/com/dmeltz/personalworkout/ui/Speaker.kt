@@ -43,8 +43,13 @@ class Speaker(context: Context) {
         }
     }
     @Volatile private var ready = false
-    /** Sentences not read yet; the first is the one being read. */
-    private val queue = ArrayDeque<String>()
+    /**
+     * Sentences not read yet, in order; the first is the one being read. Each carries the id it was
+     * last handed to the engine with, so only that utterance finishing removes it: a stale "done"
+     * from an utterance that was cut off or replaced never drops a sentence that wasn't read.
+     */
+    private class Sentence(val text: String, var id: String = "")
+    private val queue = ArrayDeque<Sentence>()
     private var counter = 0
 
     init {
@@ -55,7 +60,7 @@ class Speaker(context: Context) {
                 tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
                     override fun onDone(utteranceId: String?) {
-                        if (utteranceId?.startsWith(SENTENCE) == true) synchronized(queue) { queue.removeFirstOrNull() }
+                        if (utteranceId?.startsWith(SENTENCE) == true) synchronized(queue) { queue.removeAll { it.id == utteranceId } }
                         main.removeCallbacks(release)
                         main.postDelayed(release, RELEASE_MS)
                     }
@@ -72,7 +77,7 @@ class Speaker(context: Context) {
     fun say(text: String) {
         synchronized(queue) {
             queue.clear()
-            queue.addAll(sentences(text))
+            queue.addAll(sentences(text).map { Sentence(it) })
         }
         if (ready) speakQueue(flush = true)
     }
@@ -81,8 +86,10 @@ class Speaker(context: Context) {
     fun interject(cue: String) {
         if (!ready) return
         duck()
+        // New ids before the flush, so the cut-off sentence's late "done" can't drop it.
+        val rest = renumbered()
         tts.speak(spoken(cue), TextToSpeech.QUEUE_FLUSH, null, "cue")
-        speakQueue(flush = false)
+        enqueue(rest)
     }
 
     /** True while something is being read, or waits to be read. */
@@ -108,11 +115,18 @@ class Speaker(context: Context) {
     }
 
     private fun speakQueue(flush: Boolean) {
-        val sentences = synchronized(queue) { queue.toList() }
+        val sentences = renumbered()
         if (sentences.isNotEmpty()) duck()
         if (flush) tts.stop()
-        sentences.forEach { tts.speak(spoken(it), TextToSpeech.QUEUE_ADD, null, SENTENCE + counter++) }
+        enqueue(sentences)
     }
+
+    /** Gives every sentence not read yet a fresh utterance id, and returns them with it. */
+    private fun renumbered(): List<Pair<String, String>> =
+        synchronized(queue) { queue.onEach { it.id = SENTENCE + counter++ }.map { it.text to it.id } }
+
+    private fun enqueue(sentences: List<Pair<String, String>>) =
+        sentences.forEach { (text, id) -> tts.speak(spoken(text), TextToSpeech.QUEUE_ADD, null, id) }
 
     private companion object {
         const val SENTENCE = "sentence-"
