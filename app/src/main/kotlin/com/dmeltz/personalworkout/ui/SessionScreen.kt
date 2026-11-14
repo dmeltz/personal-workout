@@ -264,6 +264,8 @@ fun SessionScreen(
                 update(state.copy(readAloud = !state.readAloud))
             }) { Text(if (state.readAloud) "🔊" else "🔇", fontSize = 18.sp) }
         }
+        // Your music app's controls; its volume dips by itself while the app speaks.
+        if (!done) MusicControls(Modifier.align(Alignment.End).padding(end = 8.dp))
         if (paused.value && !done) {
             // Paused: continue, or move around the workout.
             val inWorkout = session?.warmupDone == true
@@ -432,7 +434,7 @@ private fun TodaysPlan(exercises: List<Exercise>, warmup: List<WarmupMove>, stat
                 PlanRow("${i + 1}. ${ex.variation(es.variation).name}", amount, seconds)
             }
             Text(
-                "Times include the rests between sets. Once the warm-up is done, the workout runs by itself. ⏸ at the top pauses it, and from there you can go back, start over or skip ahead.",
+                "Times include the rests between sets. Once the warm-up is done, the workout runs by itself. ⏸ at the top pauses it, and from there you can go back, start over or skip ahead. Play music from any app: it gets quieter while I speak, and the Music buttons skip or pause it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
