@@ -434,7 +434,7 @@ private fun TodaysPlan(exercises: List<Exercise>, warmup: List<WarmupMove>, stat
                 PlanRow("${i + 1}. ${ex.variation(es.variation).name}", amount, seconds)
             }
             Text(
-                "Times include the rests between sets. Once the warm-up is done, the workout runs by itself. ⏸ at the top pauses it, and from there you can go back, start over or skip ahead. Play music from any app: it gets quieter while I speak, and the Music buttons skip or pause it.",
+                "Times include the rests between sets. Once the warm-up is done, the workout runs by itself. ⏸ at the top pauses it, and from there you can go back, start over or skip ahead. Play music from any app (♪ YouTube Music opens it): it gets quieter while I speak, and the buttons next to it skip or pause it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
