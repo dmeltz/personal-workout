@@ -379,6 +379,7 @@ fun SessionScreen(
                             readAloud = state.readAloud,
                             speak = speaker::say,
                             cue = speaker::interject,
+                            speaking = { speaker.speaking },
                         ) { sets, effort ->
                             speaker.stop()
                             log(ex, sets, effort)
@@ -536,6 +537,8 @@ private fun ExerciseView(
     speak: (String) -> Unit,
     /** Reads a short cue now; instructions still being read carry on after it. */
     cue: (String) -> Unit,
+    /** True while the instructions are still being read aloud. */
+    speaking: () -> Boolean = { false },
     onLog: (List<Int>, Effort) -> Unit,
 ) {
     val v = ex.variation(es.variation)
@@ -596,7 +599,7 @@ private fun ExerciseView(
     if (es.times == 0) PipSays(Mood.CALM, Mascot.newExercise(), size = 48.dp)
     Text(v.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
     if (v.name != ex.title) Text(ex.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.outline)
-    if (step == INTRO) IntroCountdown { step = 0 }
+    if (step == INTRO) IntroCountdown(listening = { readAloud && speaking() }) { step = 0 }
     ex.figureAt(es.variation).let { name -> key(name) { FigureViews(name, 190.dp) } }
     // How to do it and the form cues, right under the figure.
     Text(v.how, style = MaterialTheme.typography.bodyLarge)
@@ -730,27 +733,44 @@ private fun ExerciseView(
 
 /** Seconds to read the instructions before the first set. */
 private const val INTRO_SECONDS = 10
+/** After the instructions are read aloud, seconds to get in position. */
+private const val INTRO_AFTER_READING_SECONDS = 5
+/** The longest the first set waits for the instructions to be read. */
+private const val INTRO_MAX_SECONDS = 90
 private const val INTRO = -1
 /** Seconds to say how an exercise felt before it is logged as OK. */
 private const val FEEL_SECONDS = 5
 
 /**
- * About 10 seconds to read the instructions, then the first set starts. Instructions still being
- * read aloud carry on during the set.
+ * Time to take in the instructions before the first set. When they are read aloud, the countdown
+ * waits until the reading ends (up to [INTRO_MAX_SECONDS]), so the first set's cue never cuts them
+ * short; then a few seconds to get in position. Otherwise about 10 seconds to read them.
  */
 @Composable
-private fun IntroCountdown(onDoneClick: () -> Unit) {
+private fun IntroCountdown(listening: () -> Boolean, onDoneClick: () -> Unit) {
     val paused = LocalPaused.current
     val onDone by rememberUpdatedState(onDoneClick)
+    val isListening by rememberUpdatedState(listening)
+    var waiting by remember { mutableStateOf(true) }
     var left by remember { mutableIntStateOf(INTRO_SECONDS) }
     LaunchedEffect(Unit) {
+        // Give the reading a moment to begin, then wait for it to end.
+        delay(500)
+        var waited = 0
+        while (isListening() && waited < INTRO_MAX_SECONDS * 5) {
+            while (paused.value) delay(200)
+            delay(200)
+            waited++
+        }
+        if (waited > 0) left = INTRO_AFTER_READING_SECONDS
+        waiting = false
         while (left > 0) { tick(paused); left-- }
         beep()
         onDone()
     }
     StepCard(highlight = true) {
         Text(
-            "Read the instructions. Set 1 starts in $left s",
+            if (waiting) "Listen to the instructions. Set 1 starts after them." else "Get in position. Set 1 starts in $left s",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f).padding(vertical = 8.dp),
         )
