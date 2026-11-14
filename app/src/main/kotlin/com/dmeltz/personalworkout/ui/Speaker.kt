@@ -1,6 +1,11 @@
 package com.dmeltz.personalworkout.ui
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.compose.runtime.Composable
@@ -13,9 +18,30 @@ import java.util.Locale
  * Reads text aloud, a sentence at a time. Text asked for before the engine is ready is read once it
  * is. A short cue such as "Start set 1" can cut in with [interject]; the sentences it interrupted
  * are read after it.
+ *
+ * While it speaks, other apps' audio (music from YouTube Music, Spotify and so on) is turned down,
+ * and it comes back up when it stops.
  */
 class Speaker(context: Context) {
     private lateinit var tts: TextToSpeech
+    private val audio = context.applicationContext.getSystemService(AudioManager::class.java)
+    private val attributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+        .build()
+    private val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        .setAudioAttributes(attributes)
+        .setOnAudioFocusChangeListener { }
+        .build()
+    private val main = Handler(Looper.getMainLooper())
+    private var ducked = false
+    // The music comes back a moment after the last sentence, not between sentences.
+    private val release = Runnable {
+        if (!speaking) {
+            audio?.abandonAudioFocusRequest(focus)
+            ducked = false
+        }
+    }
     @Volatile private var ready = false
     /** Sentences not read yet; the first is the one being read. */
     private val queue = ArrayDeque<String>()
@@ -25,10 +51,13 @@ class Speaker(context: Context) {
         tts = TextToSpeech(context.applicationContext) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts.language = Locale.US
+                tts.setAudioAttributes(attributes)
                 tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
                     override fun onDone(utteranceId: String?) {
                         if (utteranceId?.startsWith(SENTENCE) == true) synchronized(queue) { queue.removeFirstOrNull() }
+                        main.removeCallbacks(release)
+                        main.postDelayed(release, RELEASE_MS)
                     }
                     @Deprecated("Deprecated in Java")
                     override fun onError(utteranceId: String?) = onDone(utteranceId)
@@ -51,6 +80,7 @@ class Speaker(context: Context) {
     /** Reads a short [cue] now, then goes on with whatever it interrupted, from the start of that sentence. */
     fun interject(cue: String) {
         if (!ready) return
+        duck()
         tts.speak(spoken(cue), TextToSpeech.QUEUE_FLUSH, null, "cue")
         speakQueue(flush = false)
     }
@@ -61,18 +91,32 @@ class Speaker(context: Context) {
     fun stop() {
         synchronized(queue) { queue.clear() }
         if (ready) tts.stop()
+        main.removeCallbacks(release)
+        main.postDelayed(release, RELEASE_MS)
     }
 
-    fun shutdown() = tts.shutdown()
+    fun shutdown() {
+        main.removeCallbacks(release)
+        if (ducked) audio?.abandonAudioFocusRequest(focus)
+        tts.shutdown()
+    }
+
+    /** Turns other apps' audio down until the speaking stops. */
+    private fun duck() {
+        main.removeCallbacks(release)
+        if (!ducked) ducked = audio?.requestAudioFocus(focus) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
 
     private fun speakQueue(flush: Boolean) {
         val sentences = synchronized(queue) { queue.toList() }
+        if (sentences.isNotEmpty()) duck()
         if (flush) tts.stop()
         sentences.forEach { tts.speak(spoken(it), TextToSpeech.QUEUE_ADD, null, SENTENCE + counter++) }
     }
 
     private companion object {
         const val SENTENCE = "sentence-"
+        const val RELEASE_MS = 600L
 
         fun sentences(text: String): List<String> =
             text.split(Regex("""(?<=[.!?])\s+""")).map { it.trim() }.filter { it.isNotEmpty() }

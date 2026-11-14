@@ -3,6 +3,8 @@
 
     <!-- Lets the app find the phone's text-to-speech engine (warm-up move names). -->
     <queries>
+        <!-- The workout screen's button that opens YouTube Music. -->
+        <package android:name="com.google.android.apps.youtube.music" />
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
