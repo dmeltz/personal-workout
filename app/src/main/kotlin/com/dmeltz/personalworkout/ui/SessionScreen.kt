@@ -548,9 +548,8 @@ private fun ExerciseView(
     onLog: (List<Int>, Effort) -> Unit,
 ) {
     val v = ex.variation(es.variation)
-    // The instructions are read aloud as the exercise comes up, with the form cues the first time
-    // at this variation.
-    val spoken = remember(ex.id, es.variation) { instructions(ex, es, previous.none { it.variationIndex == es.variation }) }
+    // The instructions are read aloud as the exercise comes up, with every form cue shown on screen.
+    val spoken = remember(ex.id, es.variation) { instructions(ex, es) }
     LaunchedEffect(ex.id, es.variation) {
         val intro = when {
             again -> "Again. "
@@ -1005,13 +1004,13 @@ private fun clock(seconds: Long): String {
 }
 
 /** What is read aloud when an exercise comes up. */
-private fun instructions(ex: Exercise, es: ExerciseState, withCues: Boolean): String = buildString {
+private fun instructions(ex: Exercise, es: ExerciseState): String = buildString {
     val v = ex.variation(es.variation)
     append(v.name).append(". ")
     append(v.how).append(' ')
     append("${es.sets} sets of ${ex.amount(es.variation, es.target)}. ")
     ex.sidesHow(es.variation, es.target)?.let { append(it).append(' ') }
-    if (withCues) (ex.cues + v.cues).forEach { append(it).append(' ') }
+    (ex.cues + v.cues).forEach { append(it).append(' ') }
 }
 
 @Composable
