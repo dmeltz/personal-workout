@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.dmeltz.personalworkout.core.AppState
 import com.dmeltz.personalworkout.core.Body
 import com.dmeltz.personalworkout.core.DayKind
+import com.dmeltz.personalworkout.core.Effort
 import com.dmeltz.personalworkout.core.Figures
 import com.dmeltz.personalworkout.core.Library
 import com.dmeltz.personalworkout.core.Mascot
@@ -131,6 +132,10 @@ fun HomeScreen(
                     drawStopIndicator = {},
                     gapSize = 0.dp,
                 )
+                Spacer(Modifier.height(8.dp))
+                PlanRows(library, state, unfinished.exerciseIds) { id ->
+                    unfinished.logged(id)?.let { it.effort != Effort.SKIPPED }
+                }
             } else if (plan != null && !trained) {
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -138,19 +143,7 @@ fun HomeScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                // Each exercise with a small still figure of the variation you will do.
-                for (ex in plan.exerciseIds.mapNotNull { library.exercise(it) }) {
-                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        val variation = state.exerciseState(ex.id)?.variation ?: state.startLevels[ex.id]?.variation ?: ex.start
-                        Box(Modifier.size(44.dp)) {
-                            Figures.views(ex.figureAt(variation)).firstOrNull()?.let { f ->
-                                StickFigure(f, Modifier.fillMaxSize(), still = true)
-                            }
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Text(ex.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    }
-                }
+                PlanRows(library, state, plan.exerciseIds)
             }
             Spacer(Modifier.height(20.dp))
             when {
@@ -199,6 +192,37 @@ private fun StatCard(label: String, value: String, modifier: Modifier) {
         Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(value, fontSize = 40.sp, fontWeight = FontWeight.Bold)
             Text(label, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+/**
+ * Each exercise of a workout with a small still figure of its variation. [done] is true for an
+ * exercise already done, false for one skipped, and null for one still to come.
+ */
+@Composable
+private fun PlanRows(library: Library, state: AppState, ids: List<String>, done: (String) -> Boolean? = { null }) {
+    for (ex in ids.mapNotNull { library.exercise(it) }) {
+        val result = done(ex.id)
+        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            val variation = state.exerciseState(ex.id)?.variation ?: state.startLevels[ex.id]?.variation ?: ex.start
+            Box(Modifier.size(44.dp)) {
+                Figures.views(ex.figureAt(variation)).firstOrNull()?.let { f ->
+                    StickFigure(f, Modifier.fillMaxSize(), still = true)
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                ex.title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (result != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            when (result) {
+                true -> Text("✓", color = Good, fontWeight = FontWeight.Bold)
+                false -> Text("skipped", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                null -> {}
+            }
         }
     }
 }
