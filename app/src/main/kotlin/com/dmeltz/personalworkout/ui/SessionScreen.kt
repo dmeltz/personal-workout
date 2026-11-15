@@ -75,6 +75,7 @@ import com.dmeltz.personalworkout.core.Mascot
 import com.dmeltz.personalworkout.core.Measure
 import com.dmeltz.personalworkout.core.Mood
 import com.dmeltz.personalworkout.core.Progression
+import com.dmeltz.personalworkout.core.Sides
 import com.dmeltz.personalworkout.core.SessionBuilder
 import com.dmeltz.personalworkout.core.Sessions
 import com.dmeltz.personalworkout.core.WarmupMove
@@ -670,6 +671,8 @@ private fun ExerciseView(
             i + 1, value, ex.measure,
             step = if (ex.measure == Measure.REPS) 1 else 5,
             perSide = ex.perSide(es.variation),
+            switchSides = ex.sidesAt(es.variation) == Sides.EACH,
+            onSwitch = { if (readAloud) cue("Change side") },
             active = step == 2 * i,
             onStart = { step = 2 * i },
             onEnd = { step = 2 * i + 1 },
@@ -739,6 +742,8 @@ private fun ExerciseView(
 /** Seconds to read the instructions before the first set. */
 private const val INTRO_SECONDS = 10
 private const val INTRO = -1
+/** Seconds to change sides in the middle of a one-sided set. */
+private const val SWITCH_SECONDS = 5
 /** Seconds to say how an exercise felt before it is logged as OK. */
 private const val FEEL_SECONDS = 5
 
@@ -787,6 +792,9 @@ private fun SetRow(
     measure: Measure,
     step: Int,
     perSide: Boolean,
+    /** All of one side, then all of the other: the switch is a step of its own, with "Change side" said. */
+    switchSides: Boolean = false,
+    onSwitch: () -> Unit = {},
     active: Boolean,
     onStart: () -> Unit,
     onEnd: () -> Unit,
@@ -799,6 +807,19 @@ private fun SetRow(
     var side by remember { mutableIntStateOf(1) }
     val change by rememberUpdatedState(onChange)
     val end by rememberUpdatedState(onEnd)
+    val switch by rememberUpdatedState(onSwitch)
+    // For a set of reps on each side: 1 on the first side, 0 while changing sides, 2 on the second.
+    var repSide by remember { mutableIntStateOf(1) }
+    val repsBySide = measure == Measure.REPS && switchSides
+    LaunchedEffect(active) { if (!active) repSide = 1 }
+    LaunchedEffect(repSide) {
+        if (repSide != 0) return@LaunchedEffect
+        switch()
+        left = SWITCH_SECONDS
+        while (left > 0) { tick(paused); left-- }
+        beep(short = false)
+        repSide = 2
+    }
     LaunchedEffect(running) {
         if (!running) return@LaunchedEffect
         val sides = if (perSide) 2 else 1
@@ -813,8 +834,9 @@ private fun SetRow(
             beep(short = false)
             if (s < sides) {
                 // A few seconds to switch sides before the second hold.
-                left = 5
+                left = SWITCH_SECONDS
                 side = 0
+                if (switchSides) switch()
                 while (left > 0) { tick(paused); left-- }
             }
         }
@@ -825,24 +847,28 @@ private fun SetRow(
         Column(Modifier.width(64.dp)) {
             Text("Set $number", style = MaterialTheme.typography.bodyLarge)
             if (perSide) {
+                val bySide = repsBySide && active
                 Text(
                     when {
+                        bySide && repSide == 0 -> "change side"
+                        bySide -> "side $repSide of 2"
                         !running -> "per side"
-                        side == 0 -> "switch!"
+                        side == 0 -> "change side"
                         else -> "side $side of 2"
                     },
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (running) Good else MaterialTheme.colorScheme.outline,
+                    color = if (running || bySide) Good else MaterialTheme.colorScheme.outline,
                 )
             }
         }
         FilledTonalButton(onClick = { onChange((value - step).coerceAtLeast(0)) }, enabled = !running) { Text("−") }
+        val switching = (running && side == 0) || (repsBySide && active && repSide == 0)
         Text(
-            if (running) "$left s" else if (measure == Measure.REPS) "$value" else "$value s",
+            if (switching) "⇄ $left s" else if (running) "$left s" else if (measure == Measure.REPS) "$value" else "$value s",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            color = if (running) Good else MaterialTheme.colorScheme.onSurface,
+            color = if (running || switching) Good else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.width(76.dp),
         )
         FilledTonalButton(onClick = { onChange(value + step) }, enabled = !running) { Text("+") }
@@ -856,6 +882,11 @@ private fun SetRow(
                     onEnd()
                 } else onStart()
             }) { Text(if (running) "Stop" else "Start") }
+        } else if (active && repsBySide && repSide == 1) {
+            // First side done: the change of side comes next, then the second side.
+            Button(onClick = { repSide = 0 }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) { Text("Side done") }
+        } else if (active && repsBySide && repSide == 0) {
+            TextButton(onClick = { repSide = 2 }) { Text("Skip") }
         } else if (active) {
             Button(onClick = onEnd, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) { Text("Done") }
         }
