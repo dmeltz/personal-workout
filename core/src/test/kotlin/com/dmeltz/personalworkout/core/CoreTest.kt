@@ -61,6 +61,36 @@ class CoreTest {
         assertEquals(pushup.variation(2).min, s.target)
     }
 
+    @Test fun steadyHandstandOkHoldsUntilFiveOks() {
+        val hs = ex("HANDSTAND")
+        assertTrue(hs.steady)
+        var s = Progression.initial(hs, monday).copy(target = 30)
+        val v = s.variation
+        // Four OKs keep the time; the fifth moves it up by a small step and starts the count again.
+        repeat(4) { i ->
+            s = Progression.apply(hs, s, listOf(30, 30), Effort.OK, monday + i)
+            assertEquals(30, s.target)
+            assertEquals(i + 1, s.oks)
+        }
+        s = Progression.apply(hs, s, listOf(30, 30), Effort.OK, monday + 4)
+        assertEquals(35, s.target)
+        assertEquals(0, s.oks)
+        assertEquals(v, s.variation)
+        // Easy moves up next time; Hard brings it down, even when the time was held.
+        s = Progression.apply(hs, s, listOf(35, 35), Effort.EASY, monday + 5)
+        assertEquals(40, s.target)
+        s = Progression.apply(hs, s, listOf(40, 40), Effort.HARD, monday + 6)
+        assertEquals(35, s.target)
+        // A Hard or Easy in between starts the OK count again.
+        s = Progression.apply(hs, s, listOf(35, 35), Effort.OK, monday + 7)
+        assertEquals(1, s.oks)
+        s = Progression.apply(hs, s, listOf(35, 35), Effort.HARD, monday + 8)
+        assertEquals(0, s.oks)
+        assertEquals(30, s.target)
+        // Other exercises are unchanged: OK is still a small step up.
+        assertTrue(!ex("PUSHUP").steady)
+    }
+
     @Test fun hardHoldsAndMissesComeDown() {
         val squat = ex("SQUAT")
         val s = Progression.initial(squat, monday).copy(target = 18)
@@ -283,7 +313,15 @@ class CoreTest {
         // The same result as doing it straight through: progress, muscle groups and counts.
         assertEquals(straight.exercises, state.exercises)
         assertEquals(straight.groupLastTrained, state.groupLastTrained)
-        assertEquals(straight.activeSession, session())
+        // The same session, except where a group's day before an exercise was kept from its first,
+        // skipped log: both undo to the same day.
+        fun ActiveSession.withoutGroupDays() = copy(undo = undo.map { it.copy(groupDayBefore = null) })
+        assertEquals(straight.activeSession!!.withoutGroupDays(), session().withoutGroupDays())
+        val undoneStraight = Sessions.restart(straight)
+        val undone = Sessions.restart(state)
+        assertEquals(undoneStraight.exercises, undone.exercises)
+        assertEquals(undoneStraight.groupLastTrained, undone.groupLastTrained)
+        assertEquals(started.groupLastTrained, undone.groupLastTrained)
     }
 
     @Test fun restartUndoesTheWholeWorkoutAndTheClock() {

@@ -85,6 +85,7 @@ rest: 60
 start: 1
 intro: 1
 equipment: a clear stretch of wall
+progress: steady
 figure: HANDSTAND
 muscles: shoulders triceps wrists | upper_back abs forearms hands
 cue: Arms locked straight. Push the floor away so your shoulders reach up toward your ears.
