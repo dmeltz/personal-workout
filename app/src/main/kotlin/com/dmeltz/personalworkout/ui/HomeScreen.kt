@@ -42,6 +42,7 @@ import com.dmeltz.personalworkout.core.Progression
 import com.dmeltz.personalworkout.core.SessionBuilder
 import com.dmeltz.personalworkout.core.Sessions
 import com.dmeltz.personalworkout.core.sessionToContinue
+import com.dmeltz.personalworkout.core.views
 import com.dmeltz.personalworkout.currentMood
 import com.dmeltz.personalworkout.today
 
