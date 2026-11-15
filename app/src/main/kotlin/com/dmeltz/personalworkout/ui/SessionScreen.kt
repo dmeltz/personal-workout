@@ -1,5 +1,9 @@
 package com.dmeltz.personalworkout.ui
 
+import com.dmeltz.personalworkout.core.views
+import com.dmeltz.personalworkout.core.Figures
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
 import android.media.AudioManager
 import android.media.ToneGenerator
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -431,7 +435,7 @@ private fun TodaysPlan(exercises: List<Exercise>, warmup: List<WarmupMove>, stat
                     Text("Cooldown stretches", style = MaterialTheme.typography.labelLarge, color = groupColors.getValue(Group.FLEXIBILITY))
                 }
                 val amount = if (es.sets == 1) ex.amount(es.variation, es.target) + " hold" else "${es.sets} × ${ex.amount(es.variation, es.target)}"
-                PlanRow("${i + 1}. ${ex.variation(es.variation).name}", amount, seconds)
+                PlanRow("${i + 1}. ${ex.variation(es.variation).name}", amount, seconds, ex.figureAt(es.variation))
             }
             Text(
                 "Times include the rests between sets. Once the warm-up is done, the workout runs by itself. ⏸ at the top pauses it, and from there you can go back, start over or skip ahead. Play music from any app (♪ YouTube Music opens it): it gets quieter while I speak, and the buttons next to it skip or pause it.",
@@ -443,8 +447,13 @@ private fun TodaysPlan(exercises: List<Exercise>, warmup: List<WarmupMove>, stat
 }
 
 @Composable
-private fun PlanRow(name: String, detail: String, seconds: Int) {
+private fun PlanRow(name: String, detail: String, seconds: Int, figure: String? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
+        // A small still figure of the variation, so each exercise is recognised at a glance.
+        Box(Modifier.size(44.dp)) {
+            figure?.let { Figures.views(it).firstOrNull() }?.let { f -> StickFigure(f, Modifier.fillMaxSize(), still = true) }
+        }
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.bodyLarge)
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
