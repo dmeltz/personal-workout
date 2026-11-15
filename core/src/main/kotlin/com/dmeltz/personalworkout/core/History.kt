@@ -35,6 +35,10 @@ object History {
             lastDone = previous?.day ?: -1,
             times = (s.times - 1).coerceAtLeast(0),
             struggles = if (struggled) (s.struggles - 1).coerceAtLeast(0) else 0,
+            oks = records.filter { it.exerciseId == ex.id && it.timestamp < r.timestamp }
+                .sortedByDescending { it.timestamp }
+                .takeWhile { it.effort == Effort.OK && it.variationIndex == r.variationIndex && it.target == r.target && (it.done.minOrNull() ?: 0) >= it.target }
+                .size,
         )
     }
 

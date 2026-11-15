@@ -88,12 +88,6 @@ data class Exercise(
     val secondary: List<Muscle> = emptyList(),
     /** A stretch for the lower back and pelvis: every cooldown has one (Daniel asked for the emphasis). */
     val lowerBack: Boolean = false,
-    /**
-     * Steady progression (`progress: steady`, Daniel asked for it on handstands): OK keeps the
-     * target and only every [Progression.STEADY_OKS]th OK in a row moves it up, Easy moves it up,
-     * Hard brings it down.
-     */
-    val steady: Boolean = false,
 ) {
     fun variation(index: Int): Variation = variations[index.coerceIn(0, variations.lastIndex)]
     val unit: String get() = if (measure == Measure.REPS) "reps" else "s"
@@ -279,11 +273,6 @@ object LibraryParser {
                     "lower back" -> true
                     else -> error("Exercise $exId: focus must be 'lower back'")
                 },
-                steady = when (fields["progress"]) {
-                    null -> false
-                    "steady" -> true
-                    else -> error("Exercise $exId: progress must be 'steady'")
-                },
             )
             require(ex.variations.isNotEmpty()) { "Exercise $exId has no variations" }
             require(ex.start in ex.variations.indices) { "Exercise $exId: start is past the last variation" }
@@ -320,7 +309,7 @@ object LibraryParser {
                 line.startsWith("cue:") -> (if (inVariation) varCues else cues) += line.substringAfter(":").trim()
                 line.contains(":") -> {
                     val key = line.substringBefore(":").trim()
-                    if (key !in setOf("title", "group", "measure", "sides", "sets", "rest", "start", "intro", "equipment", "figure", "muscles", "focus", "progress")) {
+                    if (key !in setOf("title", "group", "measure", "sides", "sets", "rest", "start", "intro", "equipment", "figure", "muscles", "focus")) {
                         fail("unknown field")
                     }
                     fields[key] = line.substringAfter(":").trim()

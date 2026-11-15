@@ -112,9 +112,10 @@ class PlannerTest {
         // In three weeks every stretch comes around, the lower back ones about every 6 workouts.
         val done = plan.flatMap { d -> d.items.map { it.exerciseId } }
         assertEquals(emptySet(), stretches.map { it.id }.toSet() - done.toSet())
-        // Stretch holds grow when they come back.
+        // Stretch holds never shrink when they come back at OK (they grow after 5 OKs in a row).
         val folds = plan.flatMap { d -> d.items.filter { it.exerciseId == "FORWARD_FOLD" } }
-        assertTrue(folds.zipWithNext().all { (a, b) -> b.variation > a.variation || b.target > a.target })
+        assertTrue(folds.size >= 2)
+        assertTrue(folds.zipWithNext().all { (a, b) -> b.variation > a.variation || b.target >= a.target })
     }
 
     @Test fun stretchesDontCountAsMuscleWorkOrOverallLevel() {

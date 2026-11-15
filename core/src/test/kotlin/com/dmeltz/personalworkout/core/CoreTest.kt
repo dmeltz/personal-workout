@@ -54,50 +54,53 @@ class CoreTest {
         s = Progression.apply(pushup, s, listOf(6, 6), Effort.EASY, monday)
         assertEquals(8, s.target)
         s = Progression.apply(pushup, s, listOf(8, 8), Effort.OK, monday + 1)
-        assertEquals(9, s.target)
+        assertEquals(8, s.target)
         s = s.copy(target = 15)
         s = Progression.apply(pushup, s, listOf(15, 15), Effort.EASY, monday + 2)
         assertEquals(2, s.variation)
         assertEquals(pushup.variation(2).min, s.target)
     }
 
-    @Test fun steadyHandstandOkHoldsUntilFiveOks() {
+    @Test fun okHoldsUntilFiveOksEasyUpHardDown() {
         val hs = ex("HANDSTAND")
-        assertTrue(hs.steady)
-        var s = Progression.initial(hs, monday).copy(target = 30)
+        var s = Progression.initial(hs, monday).copy(target = 20)
         val v = s.variation
         // Four OKs keep the time; the fifth moves it up by a small step and starts the count again.
         repeat(4) { i ->
-            s = Progression.apply(hs, s, listOf(30, 30), Effort.OK, monday + i)
-            assertEquals(30, s.target)
+            s = Progression.apply(hs, s, listOf(20, 20), Effort.OK, monday + i)
+            assertEquals(20, s.target)
             assertEquals(i + 1, s.oks)
         }
-        s = Progression.apply(hs, s, listOf(30, 30), Effort.OK, monday + 4)
-        assertEquals(35, s.target)
+        s = Progression.apply(hs, s, listOf(20, 20), Effort.OK, monday + 4)
+        assertEquals(25, s.target)
         assertEquals(0, s.oks)
         assertEquals(v, s.variation)
         // Easy moves up next time; Hard brings it down, even when the time was held.
-        s = Progression.apply(hs, s, listOf(35, 35), Effort.EASY, monday + 5)
-        assertEquals(40, s.target)
-        s = Progression.apply(hs, s, listOf(40, 40), Effort.HARD, monday + 6)
+        s = Progression.apply(hs, s, listOf(25, 25), Effort.EASY, monday + 5)
         assertEquals(35, s.target)
-        // A Hard or Easy in between starts the OK count again.
-        s = Progression.apply(hs, s, listOf(35, 35), Effort.OK, monday + 7)
-        assertEquals(1, s.oks)
-        s = Progression.apply(hs, s, listOf(35, 35), Effort.HARD, monday + 8)
-        assertEquals(0, s.oks)
+        s = Progression.apply(hs, s, listOf(35, 35), Effort.HARD, monday + 6)
         assertEquals(30, s.target)
-        // Other exercises are unchanged: OK is still a small step up.
-        assertTrue(!ex("PUSHUP").steady)
+        // A Hard or Easy in between starts the OK count again.
+        s = Progression.apply(hs, s, listOf(30, 30), Effort.OK, monday + 7)
+        assertEquals(1, s.oks)
+        s = Progression.apply(hs, s, listOf(30, 30), Effort.HARD, monday + 8)
+        assertEquals(0, s.oks)
+        assertEquals(25, s.target)
+        assertEquals(v, s.variation)
+        // The same for reps: push-ups hold at OK and go up one on the fifth.
+        val pushup = ex("PUSHUP")
+        var p = Progression.initial(pushup, monday).copy(target = 8)
+        repeat(4) { p = Progression.apply(pushup, p, listOf(8, 8), Effort.OK, monday + it) }
+        assertEquals(8, p.target)
+        p = Progression.apply(pushup, p, listOf(8, 8), Effort.OK, monday + 4)
+        assertEquals(9, p.target)
     }
 
-    @Test fun hardHoldsAndMissesComeDown() {
+    @Test fun hardComesDownAndMissesComeDownToWhatWasDone() {
         val squat = ex("SQUAT")
         val s = Progression.initial(squat, monday).copy(target = 18)
-        assertEquals(18, Progression.apply(squat, s, listOf(18, 18), Effort.HARD, monday).target)
+        assertEquals(17, Progression.apply(squat, s, listOf(18, 18), Effort.HARD, monday).target)
         assertEquals(15, Progression.apply(squat, s, listOf(18, 15), Effort.HARD, monday).target)
-        val twice = Progression.apply(squat, s.copy(struggles = 1), listOf(18, 18), Effort.HARD, monday)
-        assertEquals(17, twice.target)
     }
 
     @Test fun skipsEaseOffAndDropAVariation() {
