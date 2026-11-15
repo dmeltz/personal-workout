@@ -1,6 +1,9 @@
 package com.dmeltz.personalworkout.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,12 +35,14 @@ import androidx.compose.ui.unit.sp
 import com.dmeltz.personalworkout.core.AppState
 import com.dmeltz.personalworkout.core.Body
 import com.dmeltz.personalworkout.core.DayKind
+import com.dmeltz.personalworkout.core.Figures
 import com.dmeltz.personalworkout.core.Library
 import com.dmeltz.personalworkout.core.Mascot
 import com.dmeltz.personalworkout.core.Progression
 import com.dmeltz.personalworkout.core.SessionBuilder
 import com.dmeltz.personalworkout.core.Sessions
 import com.dmeltz.personalworkout.core.sessionToContinue
+import com.dmeltz.personalworkout.core.views
 import com.dmeltz.personalworkout.currentMood
 import com.dmeltz.personalworkout.today
 
@@ -129,11 +134,23 @@ fun HomeScreen(
             } else if (plan != null && !trained) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "About ${plan.minutes} minutes: " +
-                        plan.exerciseIds.mapNotNull { library.exercise(it)?.title }.joinToString(", "),
+                    "About ${plan.minutes} minutes:",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // Each exercise with a small still figure of the variation you will do.
+                for (ex in plan.exerciseIds.mapNotNull { library.exercise(it) }) {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val variation = state.exerciseState(ex.id)?.variation ?: state.startLevels[ex.id]?.variation ?: ex.start
+                        Box(Modifier.size(44.dp)) {
+                            Figures.views(ex.figureAt(variation)).firstOrNull()?.let { f ->
+                                StickFigure(f, Modifier.fillMaxSize(), still = true)
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text(ex.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    }
+                }
             }
             Spacer(Modifier.height(20.dp))
             when {
