@@ -459,6 +459,10 @@ class SidesTest {
         assertEquals(new, Migrations.run(lib, new), "running it again changes nothing")
         kotlin.test.assertTrue(bug.variations.all { it.min >= 3 })
     }
+}
+
+class YogaTest {
+    private val library = LibraryParser.parse(File("../app/src/main/assets/exercises.txt").readText())
 
     @Test
     fun yogaRotatesThroughEveryPoseInFlowOrder() {
