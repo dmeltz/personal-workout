@@ -653,6 +653,13 @@ move: Hip circles, hands on hips | 20 | WU_HIPS
 move: Good mornings: hinge at the hips with a flat back | 20 | WU_HINGE
 move: Shoulder rolls and slow neck turns | 20 | WU_SHOULDERS
 
+// Basic yoga after the joint moves: the same short flow every day, done for Library.YOGA_ROUNDS
+// rounds (sun, dog, cobra, sun, dog, cobra...). "| each" would switch sides halfway.
+@yoga
+pose: Sun reach and fold | 15 | YG_SUN | Breathe in as your arms sweep up, breathe out as you fold down with soft knees.
+pose: Downward dog, pedaling the feet | 15 | YG_DOG | Walk your hands forward. Hips high, back long, bend one knee, then the other.
+pose: Cobra | 15 | YG_COBRA | Lower down. Hands under the shoulders, hips stay down; lift the chest with your back, not your arms. Then walk back up to stand.
+
 // ───────────────────────────── SAFETY ─────────────────────────────
 
 @safety

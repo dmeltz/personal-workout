@@ -981,6 +981,47 @@ figure("FX_TWIST_KNEES", [twist(0), twist(1)], ["high", "front"], props=[mat()],
 figure("FX_TWIST", [twist(0, True), twist(1, True)], ["high", "front"], props=[mat()], ms=HOLD_MS)
 
 
+# ── Yoga (warm-up flow) ──
+# Slow, breath-paced moves between two or three keys: the warm-up flows sun, dog, cobra, three times.
+YOGA_MS = 7000
+
+# Sun reach and fold: arms sweep overhead with a slight look up, then a hinge down to the floor.
+figure("YG_SUN", [
+    stand(),
+    stand(armL=fk(172, 3, 0), armR=fk(172, 3, 0), head=-14),
+    fold_stand(True),
+], ["side", "front"], loop=True, steps=5, ms=YOGA_MS + 2000)
+
+# Downward dog, pedaling the feet: hips high, arms long in line with the back; one knee bends while
+# the other heel sinks.
+DOG_PITCH, DOG_HIP_Y = 124, 29.5
+def down_dog(pedal=0):
+    """Hands on the floor in line with the arms and back, feet planted behind, straight legs."""
+    s = dict(pitch=DOG_PITCH, hip=(0, DOG_HIP_Y, 0), head=15, feet="flat")
+    f = build(s); j = f.joints()
+    feet_z = -math.sqrt(40 ** 2 - (DOG_HIP_Y - 0.5) ** 2) + 0.6
+    for side, sign in (("L", 1), ("R", -1)):
+        bent = (pedal == 1 and side == "L") or (pedal == -1 and side == "R")
+        if bent:
+            s["leg" + side] = ik((sign * 5, 3.5, feet_z + 3), (0, 0.2, 1)); s["feet" + side] = 45
+        else:
+            s["leg" + side] = ik((sign * 5, 0.5, feet_z), (0, 0.2, 1))
+        sh = j["sh" + side]
+        t = sh[1] / -f.up[1]
+        hand = sh + f.up * t
+        s["arm" + side] = ik((sign * 8, 0, hand[2] - 0.5), (sign * 0.6, 0.3, -1))
+    return s
+figure("YG_DOG", [down_dog(1), down_dog(-1)], ["side", "threeq"], props=[mat()], loop=True, steps=4, ms=YOGA_MS - 1000)
+
+# Cobra: lying face down, hands under the shoulders, the chest lifts with the hips and legs on the floor.
+def cobra(lift):
+    s = dict(pitch=82 - 20 * lift, hip=(0, 3, 0), head=-12 - 18 * lift, feet="line")
+    for side, sign in (("L", 1), ("R", -1)):
+        s["leg" + side] = ik((sign * 5, 2.5, -40), (0, -1, 0))
+        s["arm" + side] = ik((sign * 10, 0, 21), (sign * 0.5, 1, -1))
+    return s
+figure("YG_COBRA", [cobra(0), cobra(1)], ["side", "threeq"], props=[mat()], ms=YOGA_MS)
+
 # ───────────────────────────── frames, fitting, checks ─────────────────────────────
 
 def frames_of(name, misses):

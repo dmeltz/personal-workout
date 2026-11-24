@@ -27,6 +27,11 @@ class CoreTest {
         assertEquals(Muscle.entries.toSet(), covered, "every muscle on the map is some exercise's main target")
         assertTrue(library.warmup.isNotEmpty())
         for (m in library.warmup) assertNotNull(m.figure?.let { Figures.all[it] }, "warm-up ${m.name} has no figure")
+        assertTrue(library.yoga.isNotEmpty())
+        for (m in library.yoga) {
+            assertNotNull(m.figure?.let { Figures.all[it] }, "yoga ${m.name} has no figure")
+            assertNotNull(m.cue, "yoga ${m.name} has no cue")
+        }
         for (e in library.exercises) assertEquals(2, Figures.views(e.figure).size, "${e.id} has two views")
         for (e in library.exercises) for (i in e.variations.indices) {
             assertNotNull(e.variations[i].figure, "${e.id} variation ${i + 1} has its own figure")
@@ -453,5 +458,17 @@ class SidesTest {
         assertEquals(Migrations.CURRENT, new.version)
         assertEquals(new, Migrations.run(lib, new), "running it again changes nothing")
         kotlin.test.assertTrue(bug.variations.all { it.min >= 3 })
+    }
+}
+
+class YogaTest {
+    private val library = LibraryParser.parse(File("../app/src/main/assets/exercises.txt").readText())
+
+    @Test
+    fun yogaFlowRepeatsEveryDay() {
+        val flow = library.yogaFor(20_000L)
+        assertEquals(List(Library.YOGA_ROUNDS) { listOf("YG_SUN", "YG_DOG", "YG_COBRA") }.flatten(), flow.map { it.figure })
+        assertEquals(flow, library.yogaFor(20_001L))
+        assertEquals(library.warmup + flow, library.warmupFor(20_000L))
     }
 }
