@@ -354,11 +354,12 @@ fun SessionScreen(
                 done -> DoneView(finished ?: session, state, library, if (startedAt == null) 0 else ((endedAt ?: startedAt) - startedAt) / 1000, logged, ::correct, onFinished)
                 !session!!.warmupDone -> {
                     val todays = session.exerciseIds.mapNotNull { library.exercise(it) }
-                    TodaysPlan(todays, library.warmup, state, day)
+                    val warmup = library.warmupFor(session.day)
+                    TodaysPlan(todays, warmup, state, day)
                     TodaysMuscles(todays)
                     key(restarts) {
                         WarmupView(
-                            library.warmup,
+                            warmup,
                             speak = { if (state.readAloud) speaker.say(it) },
                             onStart = { update(Sessions.begin(state)) },
                         ) { update(Sessions.warmupDone(state)) }
@@ -430,7 +431,8 @@ private fun TodaysPlan(exercises: List<Exercise>, warmup: List<WarmupMove>, stat
                     color = Good,
                 )
             }
-            PlanRow("Warm-up", "${warmup.size} moves", warmupSeconds)
+            val yoga = warmup.count { it.yoga }
+            PlanRow("Warm-up", if (yoga > 0) "${warmup.size - yoga} moves + $yoga yoga poses" else "${warmup.size} moves", warmupSeconds)
             rows.forEachIndexed { i, (ex, es, seconds) ->
                 if (ex.group == Group.FLEXIBILITY && rows.getOrNull(i - 1)?.first?.group != Group.FLEXIBILITY) {
                     Text("Cooldown stretches", style = MaterialTheme.typography.labelLarge, color = groupColors.getValue(Group.FLEXIBILITY))
@@ -490,23 +492,29 @@ private fun WarmupView(moves: List<WarmupMove>, speak: (String) -> Unit, onStart
     // Each move's name is read aloud as it starts, so the phone can stay on the grass.
     LaunchedEffect(index) {
         if (index !in moves.indices) return@LaunchedEffect
-        left = moves[index].seconds
-        speak(moves[index].name)
+        val move = moves[index]
+        left = move.seconds
+        speak(listOfNotNull(if (move.yoga && moves.getOrNull(index - 1)?.yoga != true) "Yoga." else null, move.name, move.cue).joinToString(" "))
         while (left > 0) {
             tick(paused)
             left--
             if (left in 1..2) beep(short = true)
+            if (move.switchSides && left == move.seconds / 2) speak("Change side")
         }
         beep()
         if (index < moves.lastIndex) index++ else onDone()
     }
-    PipSays(Mood.CALM, "Two minutes of warm-up first. Your joints will thank you.")
+    PipSays(Mood.CALM, "About ${aboutMinutes(moves.sumOf { it.seconds })} of warm-up first, ending with a little yoga. Your joints will thank you.")
     Text("Warm-up", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
     // The current move's figure (the first one before the timer starts).
     val shownMove = moves.getOrNull(index.coerceAtLeast(0))
     shownMove?.figure?.let { name ->
         key(name) { FigureViews(name, 170.dp) }
         Text(shownMove.name, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        shownMove.cue?.let { cue ->
+            val sides = if (shownMove.switchSides) " Switch sides halfway." else ""
+            Text(cue + sides, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        }
     }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -514,7 +522,7 @@ private fun WarmupView(moves: List<WarmupMove>, speak: (String) -> Unit, onStart
                 val current = i == index
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        m.name,
+                        if (m.yoga) "🧘 ${m.name}" else m.name,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = if (current) FontWeight.Bold else FontWeight.Normal,
                         color = if (i < index) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,

@@ -981,6 +981,77 @@ figure("FX_TWIST_KNEES", [twist(0), twist(1)], ["high", "front"], props=[mat()],
 figure("FX_TWIST", [twist(0, True), twist(1, True)], ["high", "front"], props=[mat()], ms=HOLD_MS)
 
 
+# ── Yoga (warm-up flow) ──
+# Slow, breath-paced moves between two or three keys. The warm-up picks a few of these each day.
+YOGA_MS = 7000
+
+# Sun reach and fold: arms sweep overhead with a slight look up, then a hinge down to the floor.
+figure("YG_SUN", [
+    stand(),
+    stand(armL=fk(172, 3, 0), armR=fk(172, 3, 0), head=-14),
+    fold_stand(True),
+], ["side", "front"], loop=True, steps=5, ms=YOGA_MS + 2000)
+
+# Warrior II: wide stance along the left-right line, left knee bent over the ankle, arms out long,
+# looking over the left hand.
+def warrior(bend):
+    s = dict(hip=(3 * bend, 35 - 7 * bend, 0), turn=65 * bend, toes=(0.35, 0, 1),
+             legL=ik((24, 0, 0), (1, 0, 0.25)), legR=ik((-24, 0, 0), (-1, 0, 0.25)))
+    s["armL"] = fk(0, 20 + 70 * bend, 5); s["armR"] = fk(0, 20 + 70 * bend, 5)
+    return s
+figure("YG_WARRIOR", [warrior(0), warrior(1)], ["front", "threeq_low"], ms=YOGA_MS)
+
+# Low lunge, arms up: right knee down, left foot forward; arms sweep up as the hips sink forward.
+def low_lunge(up):
+    s = hip_flexor(up)
+    s["armL"] = fk(5 + 167 * up, 8, 15 - 15 * up); s["armR"] = fk(5 + 167 * up, 8, 15 - 15 * up)
+    s["head"] = -8 * up
+    return s
+figure("YG_LUNGE", [low_lunge(0), low_lunge(1)], ["side", "front"], ms=YOGA_MS)
+
+# Downward dog, pedaling the feet: hips high, arms long in line with the back; one knee bends while
+# the other heel sinks.
+DOG_PITCH, DOG_HIP_Y = 124, 29.5
+def down_dog(pedal=0):
+    """Hands on the floor in line with the arms and back, feet planted behind, straight legs."""
+    s = dict(pitch=DOG_PITCH, hip=(0, DOG_HIP_Y, 0), head=15, feet="flat")
+    f = build(s); j = f.joints()
+    feet_z = -math.sqrt(40 ** 2 - (DOG_HIP_Y - 0.5) ** 2) + 0.6
+    for side, sign in (("L", 1), ("R", -1)):
+        bent = (pedal == 1 and side == "L") or (pedal == -1 and side == "R")
+        if bent:
+            s["leg" + side] = ik((sign * 5, 3.5, feet_z + 3), (0, 0.2, 1)); s["feet" + side] = 45
+        else:
+            s["leg" + side] = ik((sign * 5, 0.5, feet_z), (0, 0.2, 1))
+        sh = j["sh" + side]
+        t = sh[1] / -f.up[1]
+        hand = sh + f.up * t
+        s["arm" + side] = ik((sign * 8, 0, hand[2] - 0.5), (sign * 0.6, 0.3, -1))
+    return s
+figure("YG_DOG", [down_dog(1), down_dog(-1)], ["side", "threeq"], props=[mat()], loop=True, steps=4, ms=YOGA_MS - 1000)
+
+# Cobra: lying face down, hands under the shoulders, the chest lifts with the hips and legs on the floor.
+def cobra(lift):
+    s = dict(pitch=82 - 20 * lift, hip=(0, 3, 0), head=-12 - 18 * lift, feet="line")
+    for side, sign in (("L", 1), ("R", -1)):
+        s["leg" + side] = ik((sign * 5, 2.5, -40), (0, -1, 0))
+        s["arm" + side] = ik((sign * 10, 0, 21), (sign * 0.5, 1, -1))
+    return s
+figure("YG_COBRA", [cobra(0), cobra(1)], ["side", "threeq"], props=[mat()], ms=YOGA_MS)
+
+# Tree pose: standing on the left leg, the right foot on the inside of the left calf, knee out to
+# the side; palms together at the chest, then reaching overhead.
+def tree(arms_up):
+    s = dict(hip=(0, 39.8, 0), legL=ik((1.5, 0, 0), (0, 0, 1)), feetR=50, anchor=("ftL", (1.5, 0, 0), "y"))
+    s["legR"] = rel("knL", (-1.5, -9, -0.5), (-1, 0.3, 0.4))
+    if arms_up:
+        s["armL"] = fk(176, 4, 0); s["armR"] = fk(176, 4, 0)
+    else:
+        s["armL"] = rel("neck", (1.5, -12, 9), (1, -0.5, 0)); s["armR"] = rel("neck", (-1.5, -12, 9), (-1, -0.5, 0))
+    return s
+figure("YG_TREE", [tree(False), tree(True)], ["front", "side"], ms=YOGA_MS)
+
+
 # ───────────────────────────── frames, fitting, checks ─────────────────────────────
 
 def frames_of(name, misses):

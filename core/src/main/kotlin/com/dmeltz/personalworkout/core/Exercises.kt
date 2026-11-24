@@ -113,14 +113,44 @@ data class Exercise(
     }
 }
 
-/** A warm-up move; [figure] names its stick figure in [Figures], if it has one. */
-data class WarmupMove(val name: String, val seconds: Int, val figure: String? = null)
+/**
+ * A warm-up move; [figure] names its stick figure in [Figures], if it has one. Yoga poses also have
+ * a form [cue], and [switchSides] poses change side halfway through.
+ */
+data class WarmupMove(
+    val name: String,
+    val seconds: Int,
+    val figure: String? = null,
+    val cue: String? = null,
+    val switchSides: Boolean = false,
+    val yoga: Boolean = false,
+)
 
 data class Library(
     val exercises: List<Exercise>,
     val warmup: List<WarmupMove>,
     val safety: List<String>,
+    /** Beginner yoga poses, in flow order (standing, then kneeling, then on the floor). */
+    val yoga: List<WarmupMove> = emptyList(),
 ) {
+    /**
+     * The day's yoga: [YOGA_PER_DAY] poses that rotate through the whole list day by day (each
+     * pose comes back about every 2 to 3 days), done in flow order.
+     */
+    fun yogaFor(day: Day): List<WarmupMove> {
+        if (yoga.size <= YOGA_PER_DAY) return yoga
+        val start = Math.floorMod(day * YOGA_PER_DAY, yoga.size.toLong()).toInt()
+        return (0 until YOGA_PER_DAY).map { (start + it) % yoga.size }.sorted().map { yoga[it] }
+    }
+
+    /** The whole warm-up for a day: the joint moves, then the day's yoga. */
+    fun warmupFor(day: Day): List<WarmupMove> = warmup + yogaFor(day)
+
+    companion object {
+        /** Yoga poses in each day's warm-up (about 1.5 minutes). */
+        const val YOGA_PER_DAY = 3
+    }
+
     private val byId = exercises.associateBy { it.id }
     fun exercise(id: String): Exercise? = byId[id]
     fun inGroup(group: Group): List<Exercise> = exercises.filter { it.group == group }
@@ -200,6 +230,9 @@ class Figure(
  * @warmup
  * move: Arm circles | 30 | WU_ARMS
  *
+ * @yoga
+ * pose: Downward dog | 30 | YG_DOG | Hips high, arms long. | each
+ *
  * @safety
  * line: Stop if something hurts.
  * ```
@@ -226,6 +259,7 @@ object LibraryParser {
     fun parse(text: String): Library {
         val exercises = mutableListOf<Exercise>()
         val warmup = mutableListOf<WarmupMove>()
+        val yoga = mutableListOf<WarmupMove>()
         val safety = mutableListOf<String>()
 
         var section = ""
@@ -287,11 +321,18 @@ object LibraryParser {
             when {
                 line.startsWith("@exercise ") -> { flushExercise(); section = "exercise"; id = line.substringAfter(" ").trim() }
                 line == "@warmup" -> { flushExercise(); section = "warmup" }
+                line == "@yoga" -> { flushExercise(); section = "yoga" }
                 line == "@safety" -> { flushExercise(); section = "safety" }
                 section == "warmup" && line.startsWith("move:") -> {
                     val parts = line.substringAfter(":").split("|").map { it.trim() }
                     if (parts.size !in 2..3) fail("move needs 'name | seconds | figure'")
                     warmup += WarmupMove(parts[0], parts[1].toIntOrNull() ?: fail("bad seconds"), parts.getOrNull(2))
+                }
+                section == "yoga" && line.startsWith("pose:") -> {
+                    val parts = line.substringAfter(":").split("|").map { it.trim() }
+                    if (parts.size !in 4..5) fail("pose needs 'name | seconds | figure | cue' and optionally '| each'")
+                    if (parts.size == 5 && parts[4] != "each") fail("the last field can only be 'each'")
+                    yoga += WarmupMove(parts[0], parts[1].toIntOrNull() ?: fail("bad seconds"), parts[2], parts[3], parts.size == 5, yoga = true)
                 }
                 section == "safety" && line.startsWith("line:") -> safety += line.substringAfter(":").trim()
                 section != "exercise" -> fail("unrecognized line")
@@ -320,7 +361,7 @@ object LibraryParser {
         flushExercise()
         val ids = exercises.map { it.id }
         ids.groupBy { it }.filter { it.value.size > 1 }.keys.firstOrNull()?.let { error("Duplicate exercise $it") }
-        return Library(exercises, warmup, safety)
+        return Library(exercises, warmup, safety, yoga)
     }
 }
 

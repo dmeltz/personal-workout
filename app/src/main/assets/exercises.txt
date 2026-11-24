@@ -653,6 +653,17 @@ move: Hip circles, hands on hips | 20 | WU_HIPS
 move: Good mornings: hinge at the hips with a flat back | 20 | WU_HINGE
 move: Shoulder rolls and slow neck turns | 20 | WU_SHOULDERS
 
+// Basic yoga after the joint moves: a few poses a day, rotating (Library.yogaFor). Listed in flow
+// order, standing first, then kneeling, then on the floor. "| each" switches sides halfway.
+@yoga
+pose: Sun reach and fold | 30 | YG_SUN | Breathe in as your arms sweep up, breathe out as you fold down with soft knees. Roll back up slowly.
+pose: Tree pose | 30 | YG_TREE | Foot on your inner calf, never on the knee. Palms together, then reach up. Fix your eyes on one spot. | each
+pose: Warrior two | 30 | YG_WARRIOR | Wide stance, front knee over the ankle, arms long at shoulder height. Look over your front hand. | each
+pose: Low lunge, arms up | 30 | YG_LUNGE | Back knee down, front knee over the ankle. Sink the hips forward as your arms sweep up. | each
+pose: Downward dog, pedaling the feet | 30 | YG_DOG | Hands wide, hips high, back long. Bend one knee, then the other; knees soft is fine.
+pose: Cobra | 30 | YG_COBRA | Hands under the shoulders, hips stay down. Lift the chest with your back, not by pushing hard on your arms.
+pose: Cat-cow | 30 | FX_CATCOW | On all fours. Breathe in, chest forward, look up; breathe out, round your back, chin in.
+
 // ───────────────────────────── SAFETY ─────────────────────────────
 
 @safety
