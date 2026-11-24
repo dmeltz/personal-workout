@@ -26,6 +26,25 @@ class PlannerTest {
         assertTrue(pushups.size >= 2 && pushups.zipWithNext().all { (a, b) -> b.variation > a.variation || b.target >= a.target })
     }
 
+    @Test fun aStrugglingExerciseHoldsBackOnlyItsOwnGroup() {
+        // Daniel's case (2026-11-24): a hard handstand stopped every new exercise for a week.
+        val waiting = setOf("CLOSE_PUSHUP", "CHINUP", "STEP_UP", "KNEE_RAISE", "BEAR_CRAWL")
+        val started = library.exercises.filter { it.id !in waiting }
+            .associate { it.id to Progression.initial(it, monday) }
+        val handstand = library.exercise("HANDSTAND")!!
+        val state = AppState(
+            exercises = started + ("HANDSTAND" to started.getValue("HANDSTAND").copy(struggles = 3)),
+            sessionsCompleted = 13,
+        )
+        val new = SessionBuilder.newExercises(library, state, monday + 6)
+        assertEquals(1, new.size)
+        assertTrue(new.single().id in waiting && new.single().group != handstand.group)
+        // Only the handstand's group left to start: it waits.
+        val onlySameGroup = state.copy(exercises = state.exercises + library.exercises
+            .filter { it.id in waiting && it.group != handstand.group }.associate { it.id to Progression.initial(it, monday) })
+        assertEquals(emptyList(), SessionBuilder.newExercises(library, onlySameGroup, monday + 6))
+    }
+
     @Test fun aTrainedTodayStartsTomorrow() {
         val state = AppState(sessionDays = listOf(monday))
         assertEquals(monday + 1, Planner.nextDays(library, state, monday, 3).first().day)

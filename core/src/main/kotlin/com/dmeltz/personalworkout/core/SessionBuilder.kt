@@ -27,7 +27,7 @@ object SessionBuilder {
     /** Minimum days between two new exercises, and sessions before the first one. */
     const val DAYS_BETWEEN_NEW = 3
     const val SESSIONS_BEFORE_NEW = 3
-    /** No new exercise while one is this many hard or skipped logs in a row. */
+    /** No new exercise in a group while one of its exercises is this many hard or skipped logs in a row. */
     const val STRUGGLING = 2
     /** Conditioning comes back after this many days. */
     const val CONDITIONING_EVERY = 3
@@ -73,11 +73,14 @@ object SessionBuilder {
         val unstarted = strength.withIndex().filter { state.exerciseState(it.value.id) == null }
         unstarted.filter { (it.value.primary - covered).isNotEmpty() && it.value.group in allowed }
             .minWithOrNull(compareBy({ it.value.intro }, { it.index }))?.let { return listOf(it.value) }
-        val struggling = state.exercises.values.any { it.struggles >= STRUGGLING }
-        if (today - lastIntroduced < DAYS_BETWEEN_NEW || state.sessionsCompleted < SESSIONS_BEFORE_NEW || struggling) {
+        // A struggling exercise holds back new ones in its own group only (one hard handstand mustn't stop the rest).
+        val strugglingGroups = state.exercises.filterValues { it.struggles >= STRUGGLING }.keys
+            .mapNotNull { library.exercise(it)?.group }.toSet()
+        if (today - lastIntroduced < DAYS_BETWEEN_NEW || state.sessionsCompleted < SESSIONS_BEFORE_NEW) {
             return emptyList()
         }
-        return unstarted.filter { it.value.group in allowed }.minWithOrNull(compareBy({ it.value.intro }, { it.index }))?.value?.let(::listOf).orEmpty()
+        return unstarted.filter { it.value.group in allowed && it.value.group !in strugglingGroups }
+            .minWithOrNull(compareBy({ it.value.intro }, { it.index }))?.value?.let(::listOf).orEmpty()
     }
 
     /** The last day an exercise that mainly works [m] was done, or never. */
