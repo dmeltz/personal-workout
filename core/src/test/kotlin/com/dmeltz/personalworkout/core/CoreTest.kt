@@ -467,7 +467,7 @@ class YogaTest {
     @Test
     fun yogaFlowRepeatsEveryDay() {
         val flow = library.yogaFor(20_000L)
-        assertEquals(listOf("YG_SUN", "YG_DOG", "YG_COBRA", "YG_SUN", "YG_DOG", "YG_COBRA"), flow.map { it.figure })
+        assertEquals(List(Library.YOGA_ROUNDS) { listOf("YG_SUN", "YG_DOG", "YG_COBRA") }.flatten(), flow.map { it.figure })
         assertEquals(flow, library.yogaFor(20_001L))
         assertEquals(library.warmup + flow, library.warmupFor(20_000L))
     }

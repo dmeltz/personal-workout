@@ -140,8 +140,8 @@ data class Library(
     fun warmupFor(day: Day): List<WarmupMove> = warmup + yogaFor(day)
 
     companion object {
-        /** Rounds of the yoga flow in each warm-up (about 1.5 minutes). */
-        const val YOGA_ROUNDS = 2
+        /** Rounds of the yoga flow in each warm-up (about 2 minutes). */
+        const val YOGA_ROUNDS = 3
     }
 
     private val byId = exercises.associateBy { it.id }

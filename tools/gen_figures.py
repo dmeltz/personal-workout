@@ -982,7 +982,7 @@ figure("FX_TWIST", [twist(0, True), twist(1, True)], ["high", "front"], props=[m
 
 
 # ── Yoga (warm-up flow) ──
-# Slow, breath-paced moves between two or three keys: the warm-up flows sun, dog, cobra, twice.
+# Slow, breath-paced moves between two or three keys: the warm-up flows sun, dog, cobra, three times.
 YOGA_MS = 7000
 
 # Sun reach and fold: arms sweep overhead with a slight look up, then a hinge down to the floor.
