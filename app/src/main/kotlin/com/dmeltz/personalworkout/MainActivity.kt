@@ -11,12 +11,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.core.content.FileProvider
 import com.dmeltz.personalworkout.core.AppState
 import com.dmeltz.personalworkout.core.DayKind
@@ -25,11 +28,13 @@ import com.dmeltz.personalworkout.core.SessionBuilder
 import com.dmeltz.personalworkout.core.Sessions
 import com.dmeltz.personalworkout.reminder.Reminders
 import com.dmeltz.personalworkout.sync.AnswerSync
+import com.dmeltz.personalworkout.sync.ReportSync
 import com.dmeltz.personalworkout.ui.AppTheme
 import com.dmeltz.personalworkout.ui.ExerciseScreen
 import com.dmeltz.personalworkout.ui.HomeScreen
 import com.dmeltz.personalworkout.ui.HistoryScreen
 import com.dmeltz.personalworkout.ui.ProgressScreen
+import com.dmeltz.personalworkout.ui.ReportButton
 import com.dmeltz.personalworkout.ui.SessionScreen
 import com.dmeltz.personalworkout.ui.SettingsScreen
 import com.dmeltz.personalworkout.widget.StreakWidget
@@ -53,6 +58,8 @@ class MainActivity : ComponentActivity() {
         )
         val repo = Repository.get(this)
         Reminders.schedule(this)
+        // Reports made while offline or before the token was set.
+        ReportSync.schedule(this)
 
         setContent {
             AppTheme {
@@ -88,6 +95,7 @@ class MainActivity : ComponentActivity() {
 
                 BackHandler(enabled = stack.size > 1) { pop() }
 
+                Box(Modifier.fillMaxSize()) {
                 key(screen) { when (screen) {
                     Screen.Home -> HomeScreen(
                         state = state,
@@ -171,6 +179,9 @@ class MainActivity : ComponentActivity() {
                         onBack = ::pop,
                     )
                 } }
+                // On every screen: report a problem or an idea, with a picture of the screen.
+                ReportButton(screen = screenName(screen), details = screenDetails(screen, state, repo))
+                }
             }
         }
     }
@@ -178,6 +189,32 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         StreakWidget.updateAll(this)
+    }
+
+    private fun screenName(screen: Screen): String = when (screen) {
+        Screen.Home -> "Home"
+        is Screen.Session -> "Workout"
+        Screen.Progress -> "My progress"
+        is Screen.Exercise -> "Exercise page"
+        Screen.Settings -> "Settings"
+        Screen.History -> "Past workouts"
+    }
+
+    /** What exactly was showing, for screens with more than one view. */
+    private fun screenDetails(screen: Screen, state: AppState, repo: Repository): String? = when (screen) {
+        is Screen.Exercise -> repo.library.exercise(screen.id)?.let { "${it.title} (${it.id})" } ?: screen.id
+        is Screen.Session -> state.activeSession?.let { a ->
+            when {
+                a.finished -> "workout finished"
+                !a.warmupDone -> "warm-up, before exercise 1 of ${a.plannedCount}"
+                else -> {
+                    val id = a.exerciseIds[a.position]
+                    val title = repo.library.exercise(id)?.title ?: id
+                    "exercise ${a.position + 1} of ${a.plannedCount}: $title ($id)"
+                }
+            }
+        }
+        else -> null
     }
 
     private fun shareExport() {
