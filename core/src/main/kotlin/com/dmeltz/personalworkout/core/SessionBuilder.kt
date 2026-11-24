@@ -22,6 +22,8 @@ data class SessionPlan(
 object SessionBuilder {
     /** Exercise time to fill with muscles that are nearly due, not counting the warm-up (about 2 minutes). Due muscles always get in. */
     const val NORMAL_SECONDS = 12 * 60
+    /** A started exercise not done for this many days joins the next workout. */
+    const val OVERDUE_DAYS = 14
     const val LIGHT_SECONDS = 7 * 60
     const val MIN_EXERCISES = 3
     /** Minimum days between two new exercises, and sessions before the first one. */
@@ -136,6 +138,11 @@ object SessionBuilder {
             chosen += best
             need -= best.primary.toSet()
         }
+        // One exercise that has waited two weeks or more joins, the longest-waiting first, so none
+        // keeps losing to others that cover the same muscles.
+        pool.filter { it !in chosen && it.group.strength && lastDone(it) in 0..(today - OVERDUE_DAYS) }
+            .minWithOrNull(compareBy(::tired, ::lastDone))
+            ?.let { chosen += it }
         // Room left? Muscles rested 2 days or more go a day early, which spreads the work evenly
         // over the days instead of every muscle falling due on the same day.
         val budget = if (light) LIGHT_SECONDS else NORMAL_SECONDS

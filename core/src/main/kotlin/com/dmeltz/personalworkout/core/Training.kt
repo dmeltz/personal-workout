@@ -21,6 +21,8 @@ data class ExerciseState(
     val times: Int = 0,
     /** Logs in a row rated hard or skipped. */
     val struggles: Int = 0,
+    /** Logs in a row rated OK at this target. */
+    val oks: Int = 0,
 )
 
 /** A level set by hand: where an exercise not started yet will start. */
@@ -245,6 +247,9 @@ object Levels {
 
 object Progression {
 
+    /** OKs in a row at one target before it moves up. */
+    const val STEADY_OKS = 5
+
     fun small(ex: Exercise) = if (ex.measure == Measure.REPS) 1 else 5
     fun big(ex: Exercise) = if (ex.measure == Measure.REPS) 2 else 10
 
@@ -278,14 +283,15 @@ object Progression {
         val struggles = if (effort == Effort.HARD || effort == Effort.SKIPPED) s.struggles + 1 else 0
 
         var variation = s.variation
+        // OK keeps the target, and only the STEADY_OKS-th OK in a row moves it up a small step.
+        // Easy moves it up next time; Hard brings it down (Daniel, 2026-11-15).
+        val oks = if (effort == Effort.OK && hit) s.oks + 1 else 0
         var target = when (effort) {
             Effort.SKIPPED -> s.target - big(ex)
-            Effort.HARD -> if (hit) s.target else achieved
-            Effort.OK -> if (hit) maxOf(s.target + small(ex), achieved) else achieved
+            Effort.HARD -> minOf(s.target - small(ex), if (hit) s.target else achieved)
+            Effort.OK -> if (!hit) achieved else if (oks >= STEADY_OKS) s.target + small(ex) else s.target
             Effort.EASY -> if (hit) maxOf(s.target + big(ex), achieved + small(ex)) else maxOf(s.target, achieved)
         }
-        // Two hard sessions in a row: ease off a step even if the target was reached.
-        if (effort == Effort.HARD && hit && struggles >= 2) target -= small(ex)
 
         if (target > v.max) {
             // Past the top of the range: the next variation, or, on the hardest one, the target stays
@@ -307,6 +313,7 @@ object Progression {
             lastDone = today,
             times = s.times + 1,
             struggles = struggles,
+            oks = if (oks >= STEADY_OKS || target != s.target || variation != s.variation) 0 else oks,
         )
     }
 
