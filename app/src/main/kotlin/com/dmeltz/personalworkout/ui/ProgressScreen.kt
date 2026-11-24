@@ -30,6 +30,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -353,17 +354,39 @@ private fun MuscleDayGrid(
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.outline,
     )
+    // The legend boxes are also switches: tap one to show or hide that kind of cell in the table.
+    var showStrength by rememberSaveable { mutableStateOf(true) }
+    var showStretch by rememberSaveable { mutableStateOf(true) }
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.clip(RoundedCornerShape(6.dp)).clickable { showStrength = !showStrength }.padding(vertical = 6.dp, horizontal = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Box(
-                Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)).background(groupColors.getValue(Group.PUSH).copy(alpha = 0.16f))
-                    .border(2.dp, StrengthColor, RoundedCornerShape(4.dp)),
+                Modifier.size(20.dp).clip(RoundedCornerShape(4.dp))
+                    .background(if (showStrength) groupColors.getValue(Group.PUSH).copy(alpha = 0.16f) else Color.Transparent)
+                    .border(2.dp, StrengthColor.copy(alpha = if (showStrength) 1f else 0.4f), RoundedCornerShape(4.dp)),
+                contentAlignment = Alignment.Center,
+            ) { if (showStrength) Text("✓", style = MaterialTheme.typography.labelSmall, color = StrengthColor) }
+            Text(
+                " Strengthening",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (showStrength) 1f else 0.5f),
             )
-            Text(" Strengthening", style = MaterialTheme.typography.labelSmall)
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(16.dp).border(2.dp, StretchColor, RoundedCornerShape(4.dp)))
-            Text(" Stretch (cooldown)", style = MaterialTheme.typography.labelSmall, color = StretchColor)
+        Row(
+            Modifier.clip(RoundedCornerShape(6.dp)).clickable { showStretch = !showStretch }.padding(vertical = 6.dp, horizontal = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(20.dp).border(2.dp, StretchColor.copy(alpha = if (showStretch) 1f else 0.4f), RoundedCornerShape(4.dp)),
+                contentAlignment = Alignment.Center,
+            ) { if (showStretch) Text("✓", style = MaterialTheme.typography.labelSmall, color = StretchColor) }
+            Text(
+                " Stretch (cooldown)",
+                style = MaterialTheme.typography.labelSmall,
+                color = StretchColor.copy(alpha = if (showStretch) 1f else 0.5f),
+            )
         }
     }
     Text(
@@ -454,7 +477,8 @@ private fun MuscleDayGrid(
                         .background(if (isSelected) selectedBg else Color.Transparent)
                         .drawBehind { drawLine(line, Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1f) },
                 ) {
-                    days.forEachIndexed { i, here ->
+                    days.forEachIndexed { i, all ->
+                        val here = all.filter { (ex, _) -> if (ex.group.strength) showStrength else showStretch }
                         Row(
                             Modifier.width(DayWidth).fillMaxHeight()
                                 .background(if (plan[i].kind == DayKind.REST && !isSelected) restBg else Color.Transparent),

@@ -29,7 +29,7 @@ private sealed interface UpdateState {
     data object Idle : UpdateState
     data object Checking : UpdateState
     data object UpToDate : UpdateState
-    data object Unknown : UpdateState
+    data class Unknown(val reason: String) : UpdateState
     data class Available(val build: Int, val url: String) : UpdateState
     data object Downloading : UpdateState
     data class Ready(val apk: File) : UpdateState
@@ -66,7 +66,7 @@ fun UpdatePanel(compact: Boolean) {
             state = when (c) {
                 is Updater.Check.Available -> UpdateState.Available(c.build, c.apkUrl)
                 Updater.Check.UpToDate -> UpdateState.UpToDate
-                Updater.Check.Unknown -> UpdateState.Unknown
+                is Updater.Check.Unknown -> UpdateState.Unknown(c.reason)
             }
         }
     }
@@ -110,11 +110,12 @@ fun UpdatePanel(compact: Boolean) {
                     Text("You have the latest version (build ${Updater.currentBuild(context)}).")
                     OutlinedButton(onClick = ::check) { Text("Check again") }
                 }
-                UpdateState.Unknown -> {
+                is UpdateState.Unknown -> {
                     Text(
-                        "The app can't check for updates by itself right now (no internet, or the " +
-                            "GitHub repository is private). You can download the newest version from the release page.",
+                        "The app couldn't check for updates (${s.reason}). " +
+                            "You can try again, or download the newest version from the release page.",
                     )
+                    OutlinedButton(onClick = ::check) { Text("Check again") }
                     Button(onClick = { Updater.openReleasePage(context) }) { Text("Open download page") }
                 }
                 is UpdateState.Available -> {
