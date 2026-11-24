@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.dmeltz.personalworkout.sync.AnswerSync
+import com.dmeltz.personalworkout.sync.ReportSync
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
@@ -34,6 +35,7 @@ fun SyncPanel() {
     var repo by remember { mutableStateOf(settings.repo) }
     var token by remember { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
+    var waitingReports by remember { mutableStateOf(ReportSync.pending(context)) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -68,6 +70,8 @@ fun SyncPanel() {
                     sending = true
                     scope.launch {
                         AnswerSync.send(context)
+                        ReportSync.sendAll(context)
+                        waitingReports = ReportSync.pending(context)
                         settings = AnswerSync.load(context)
                         sending = false
                     }
@@ -83,5 +87,12 @@ fun SyncPanel() {
             else -> "Saved. Your history will be sent after your next workout."
         }
         if (status != null) Text(status, style = MaterialTheme.typography.bodySmall)
+        // Reports from the 🐞 button go to the same repository, in its reports folder.
+        if (!sending && waitingReports > 0) {
+            Text(
+                "$waitingReports report${if (waitingReports == 1) "" else "s"} waiting to be sent.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
