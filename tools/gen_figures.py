@@ -982,7 +982,7 @@ figure("FX_TWIST", [twist(0, True), twist(1, True)], ["high", "front"], props=[m
 
 
 # ── Yoga (warm-up flow) ──
-# Slow, breath-paced moves between two or three keys. The warm-up picks a few of these each day.
+# Slow, breath-paced moves between two or three keys: the warm-up flows sun, dog, cobra, twice.
 YOGA_MS = 7000
 
 # Sun reach and fold: arms sweep overhead with a slight look up, then a hinge down to the floor.
@@ -991,23 +991,6 @@ figure("YG_SUN", [
     stand(armL=fk(172, 3, 0), armR=fk(172, 3, 0), head=-14),
     fold_stand(True),
 ], ["side", "front"], loop=True, steps=5, ms=YOGA_MS + 2000)
-
-# Warrior II: wide stance along the left-right line, left knee bent over the ankle, arms out long,
-# looking over the left hand.
-def warrior(bend):
-    s = dict(hip=(3 * bend, 35 - 7 * bend, 0), turn=65 * bend, toes=(0.35, 0, 1),
-             legL=ik((24, 0, 0), (1, 0, 0.25)), legR=ik((-24, 0, 0), (-1, 0, 0.25)))
-    s["armL"] = fk(0, 20 + 70 * bend, 5); s["armR"] = fk(0, 20 + 70 * bend, 5)
-    return s
-figure("YG_WARRIOR", [warrior(0), warrior(1)], ["front", "threeq_low"], ms=YOGA_MS)
-
-# Low lunge, arms up: right knee down, left foot forward; arms sweep up as the hips sink forward.
-def low_lunge(up):
-    s = hip_flexor(up)
-    s["armL"] = fk(5 + 167 * up, 8, 15 - 15 * up); s["armR"] = fk(5 + 167 * up, 8, 15 - 15 * up)
-    s["head"] = -8 * up
-    return s
-figure("YG_LUNGE", [low_lunge(0), low_lunge(1)], ["side", "front"], ms=YOGA_MS)
 
 # Downward dog, pedaling the feet: hips high, arms long in line with the back; one knee bends while
 # the other heel sinks.
@@ -1038,19 +1021,6 @@ def cobra(lift):
         s["arm" + side] = ik((sign * 10, 0, 21), (sign * 0.5, 1, -1))
     return s
 figure("YG_COBRA", [cobra(0), cobra(1)], ["side", "threeq"], props=[mat()], ms=YOGA_MS)
-
-# Tree pose: standing on the left leg, the right foot on the inside of the left calf, knee out to
-# the side; palms together at the chest, then reaching overhead.
-def tree(arms_up):
-    s = dict(hip=(0, 39.8, 0), legL=ik((1.5, 0, 0), (0, 0, 1)), feetR=50, anchor=("ftL", (1.5, 0, 0), "y"))
-    s["legR"] = rel("knL", (-1.5, -9, -0.5), (-1, 0.3, 0.4))
-    if arms_up:
-        s["armL"] = fk(176, 4, 0); s["armR"] = fk(176, 4, 0)
-    else:
-        s["armL"] = rel("neck", (1.5, -12, 9), (1, -0.5, 0)); s["armR"] = rel("neck", (-1.5, -12, 9), (-1, -0.5, 0))
-    return s
-figure("YG_TREE", [tree(False), tree(True)], ["front", "side"], ms=YOGA_MS)
-
 
 # ───────────────────────────── frames, fitting, checks ─────────────────────────────
 

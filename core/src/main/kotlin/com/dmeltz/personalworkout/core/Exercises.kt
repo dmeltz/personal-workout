@@ -130,25 +130,18 @@ data class Library(
     val exercises: List<Exercise>,
     val warmup: List<WarmupMove>,
     val safety: List<String>,
-    /** Beginner yoga poses, in flow order (standing, then kneeling, then on the floor). */
+    /** A short beginner yoga flow, done in order and repeated (see [yogaFor]). */
     val yoga: List<WarmupMove> = emptyList(),
 ) {
-    /**
-     * The day's yoga: [YOGA_PER_DAY] poses that rotate through the whole list day by day (each
-     * pose comes back about every 2 to 3 days), done in flow order.
-     */
-    fun yogaFor(day: Day): List<WarmupMove> {
-        if (yoga.size <= YOGA_PER_DAY) return yoga
-        val start = Math.floorMod(day * YOGA_PER_DAY, yoga.size.toLong()).toInt()
-        return (0 until YOGA_PER_DAY).map { (start + it) % yoga.size }.sorted().map { yoga[it] }
-    }
+    /** The yoga flow: [yoga] in order, [YOGA_ROUNDS] times (the same every day). */
+    fun yogaFor(@Suppress("UNUSED_PARAMETER") day: Day): List<WarmupMove> = List(YOGA_ROUNDS) { yoga }.flatten()
 
     /** The whole warm-up for a day: the joint moves, then the day's yoga. */
     fun warmupFor(day: Day): List<WarmupMove> = warmup + yogaFor(day)
 
     companion object {
-        /** Yoga poses in each day's warm-up (about 1.5 minutes). */
-        const val YOGA_PER_DAY = 3
+        /** Rounds of the yoga flow in each warm-up (about 1.5 minutes). */
+        const val YOGA_ROUNDS = 2
     }
 
     private val byId = exercises.associateBy { it.id }

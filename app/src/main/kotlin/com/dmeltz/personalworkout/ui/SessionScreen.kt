@@ -432,7 +432,7 @@ private fun TodaysPlan(exercises: List<Exercise>, warmup: List<WarmupMove>, stat
                 )
             }
             val yoga = warmup.count { it.yoga }
-            PlanRow("Warm-up", if (yoga > 0) "${warmup.size - yoga} moves + $yoga yoga poses" else "${warmup.size} moves", warmupSeconds)
+            PlanRow("Warm-up", if (yoga > 0) "${warmup.size - yoga} moves + yoga flow" else "${warmup.size} moves", warmupSeconds)
             rows.forEachIndexed { i, (ex, es, seconds) ->
                 if (ex.group == Group.FLEXIBILITY && rows.getOrNull(i - 1)?.first?.group != Group.FLEXIBILITY) {
                     Text("Cooldown stretches", style = MaterialTheme.typography.labelLarge, color = groupColors.getValue(Group.FLEXIBILITY))

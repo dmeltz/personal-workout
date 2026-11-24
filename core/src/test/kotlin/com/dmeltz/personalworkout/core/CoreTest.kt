@@ -27,7 +27,7 @@ class CoreTest {
         assertEquals(Muscle.entries.toSet(), covered, "every muscle on the map is some exercise's main target")
         assertTrue(library.warmup.isNotEmpty())
         for (m in library.warmup) assertNotNull(m.figure?.let { Figures.all[it] }, "warm-up ${m.name} has no figure")
-        assertTrue(library.yoga.size > Library.YOGA_PER_DAY)
+        assertTrue(library.yoga.isNotEmpty())
         for (m in library.yoga) {
             assertNotNull(m.figure?.let { Figures.all[it] }, "yoga ${m.name} has no figure")
             assertNotNull(m.cue, "yoga ${m.name} has no cue")
@@ -465,18 +465,10 @@ class YogaTest {
     private val library = LibraryParser.parse(File("../app/src/main/assets/exercises.txt").readText())
 
     @Test
-    fun yogaRotatesThroughEveryPoseInFlowOrder() {
-        val seen = mutableMapOf<String, Int>()
-        for (day in 20_000L until 20_000L + library.yoga.size) {
-            val poses = library.yogaFor(day)
-            assertEquals(Library.YOGA_PER_DAY, poses.size)
-            assertEquals(poses.map { library.yoga.indexOf(it) }.sorted(), poses.map { library.yoga.indexOf(it) })
-            assertTrue(library.yogaFor(day) != library.yogaFor(day + 1), "the same yoga two days in a row")
-            assertEquals(library.warmup + poses, library.warmupFor(day))
-            for (p in poses) seen[p.name] = (seen[p.name] ?: 0) + 1
-        }
-        // Over as many days as there are poses, each pose comes up equally often.
-        assertEquals(library.yoga.map { it.name }.toSet(), seen.keys)
-        assertEquals(setOf(Library.YOGA_PER_DAY), seen.values.toSet())
+    fun yogaFlowRepeatsEveryDay() {
+        val flow = library.yogaFor(20_000L)
+        assertEquals(listOf("YG_SUN", "YG_DOG", "YG_COBRA", "YG_SUN", "YG_DOG", "YG_COBRA"), flow.map { it.figure })
+        assertEquals(flow, library.yogaFor(20_001L))
+        assertEquals(library.warmup + flow, library.warmupFor(20_000L))
     }
 }
